@@ -1,0 +1,134 @@
+from datetime import datetime
+import tkinter as tk
+from tkinter import ttk
+
+from .monitors import MonitorLayout, discover_layout
+from .state import DashboardPage, JarvisMode, UiState
+
+
+BACKGROUND = "#050b18"
+PANEL = "#0a1428"
+TEXT = "#d9f5ff"
+MUTED = "#7191a8"
+
+
+def monitor_geometry(monitor) -> str:
+    return f"{monitor.width}x{monitor.height}+{monitor.x}+{monitor.y}"
+
+
+class JarvisUiApp:
+    def __init__(self, layout: MonitorLayout | None = None, state: UiState | None = None):
+        self.layout = layout or discover_layout()
+        self.state = state or UiState()
+        self.root: tk.Tk | None = None
+        self.windows: dict[str, tk.Misc] = {}
+        self.labels: dict[str, tk.Label] = {}
+        self.core_canvas: tk.Canvas | None = None
+        self._pulse_phase = 0
+
+    def _make_window(self, parent, title: str, monitor):
+        window = parent if title == "AYAKA JARVIS LEFT" else tk.Toplevel(parent)
+        window.title(title)
+        window.geometry(monitor_geometry(monitor))
+        window.configure(bg=BACKGROUND)
+        window.minsize(500, 400)
+        window.protocol("WM_DELETE_WINDOW", self.close)
+        return window
+
+    def _label(self, parent, text: str, *, size=16, color=TEXT, bold=False):
+        label = tk.Label(
+            parent,
+            text=text,
+            fg=color,
+            bg=parent.cget("bg"),
+            font=("Consolas", size, "bold" if bold else "normal"),
+            anchor="w",
+        )
+        label.pack(fill="x", padx=32, pady=5)
+        return label
+
+    def _build_left(self, window):
+        self._label(window, "FIELD RISE", size=14, color=MUTED, bold=True)
+        self._label(window, "AYAKA", size=38, color="#68e8ff", bold=True)
+        self._label(window, "SYSTEM CORE / VOICE INTERFACE", size=12, color=MUTED)
+        character = tk.Frame(window, bg=PANEL, highlightbackground="#1c6682", highlightthickness=1)
+        character.pack(fill="both", expand=True, padx=32, pady=28)
+        tk.Label(character, text="◈", fg="#68e8ff", bg=PANEL, font=("Consolas", 96, "normal")).pack(expand=True)
+        tk.Label(character, text="AYAKA // ACTIVE CHARACTER", fg="#68e8ff", bg=PANEL, font=("Consolas", 16, "bold")).pack(pady=(0, 36))
+
+    def _build_center(self, window):
+        self._label(window, "FIELD RISE // AYAKA JARVIS", size=18, color="#68e8ff", bold=True)
+        self.labels["datetime"] = self._label(window, "", size=15, color=MUTED)
+        core = tk.Frame(window, bg=PANEL, highlightbackground="#1c6682", highlightthickness=1)
+        core.pack(fill="x", padx=32, pady=24)
+        self.core_canvas = tk.Canvas(core, width=260, height=220, bg=PANEL, highlightthickness=0)
+        self.core_canvas.pack(pady=12)
+        self.labels["core"] = tk.Label(core, text="AYAKA CORE", fg="#68e8ff", bg=PANEL, font=("Consolas", 18, "bold"))
+        self.labels["core"].pack(pady=(0, 22))
+        self.labels["status"] = self._label(window, "SYSTEM / STANDBY", size=18, color="#68e8ff", bold=True)
+        self.labels["page"] = self._label(window, "HOME", size=14, color=MUTED)
+        metrics = tk.Frame(window, bg=BACKGROUND)
+        metrics.pack(fill="both", expand=True, padx=32, pady=16)
+        for title, value in (("SoundOn / THIS MONTH", "—"), ("YouTube / LAST 28 DAYS", "—")):
+            box = tk.Frame(metrics, bg=PANEL, highlightbackground="#153c55", highlightthickness=1)
+            box.pack(fill="x", pady=8)
+            tk.Label(box, text=title, fg=MUTED, bg=PANEL, font=("Consolas", 11, "bold"), anchor="w").pack(fill="x", padx=16, pady=(12, 2))
+            tk.Label(box, text=value, fg=TEXT, bg=PANEL, font=("Consolas", 24, "bold"), anchor="w").pack(fill="x", padx=16, pady=(0, 12))
+
+    def _build_right(self, window):
+        self._label(window, "MOMOKA // DEVELOPER", size=22, color="#b56cff", bold=True)
+        self._label(window, "DEVELOPER PANEL", size=13, color=MUTED)
+        panel = tk.Frame(window, bg=PANEL, highlightbackground="#543a75", highlightthickness=1)
+        panel.pack(fill="both", expand=True, padx=32, pady=28)
+        values = [
+            ("STATUS", "READY"),
+            ("CURRENT TASK", "AYAKA JARVIS v0.2"),
+            ("GitHub", "FieldRiseJapan/AYAKA-JARVIS"),
+            ("Branch", "feature/ayaka-ear-v0.1"),
+            ("Tests", "14 PASS"),
+            ("Commit", "aabce23"),
+            ("Last Action", "STT benchmark"),
+            ("Suggestion", "UI foundation"),
+        ]
+        for key, value in values:
+            tk.Label(panel, text=key, fg=MUTED, bg=PANEL, font=("Consolas", 10, "bold"), anchor="w").pack(fill="x", padx=20, pady=(14, 0))
+            tk.Label(panel, text=value, fg=TEXT, bg=PANEL, font=("Consolas", 12), anchor="w", wraplength=500, justify="left").pack(fill="x", padx=20)
+
+    def refresh(self):
+        if not self.root:
+            return
+        now = datetime.now().strftime("%Y-%m-%d  %H:%M:%S")
+        self.labels["datetime"].configure(text=now)
+        self.labels["status"].configure(text=f"SYSTEM / {self.state.system_state.value}")
+        self.labels["page"].configure(text=f"CENTER / {self.state.page.value}")
+        accent = self.state.theme_accent
+        self.labels["core"].configure(text=f"{self.state.theme_name} CORE", fg=accent)
+        self.labels["status"].configure(fg=accent)
+        if self.core_canvas:
+            self.core_canvas.delete("all")
+            self._pulse_phase = (self._pulse_phase + 1) % 40
+            radius = 62 + (self._pulse_phase if self._pulse_phase <= 20 else 40 - self._pulse_phase)
+            center_x, center_y = 130, 105
+            self.core_canvas.create_oval(center_x - radius, center_y - radius, center_x + radius, center_y + radius, outline=accent, width=3)
+            self.core_canvas.create_oval(center_x - 30, center_y - 30, center_x + 30, center_y + 30, fill=accent, outline=accent)
+        self.root.after(500, self.refresh)
+
+    def run(self):
+        self.root = tk.Tk()
+        self.windows["left"] = self._make_window(self.root, "AYAKA JARVIS LEFT", self.layout.left)
+        self.windows["center"] = self._make_window(self.root, "AYAKA JARVIS CENTER", self.layout.center)
+        self.windows["right"] = self._make_window(self.root, "AYAKA JARVIS RIGHT", self.layout.right)
+        self._build_left(self.windows["left"])
+        self._build_center(self.windows["center"])
+        self._build_right(self.windows["right"])
+        self.refresh()
+        self.root.mainloop()
+
+    def close(self):
+        if self.root:
+            self.root.destroy()
+            self.root = None
+
+
+def run_ui():
+    JarvisUiApp().run()

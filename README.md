@@ -67,6 +67,26 @@ AYAKA JARVIS v0.1
 
 `--tts` を付けると、ウェイクワード検出時に Windows の `System.Speech` で設定された応答を発話します。音声デバイス設定自体は変更しません。
 
+## v0.2 UI foundation: three monitors
+
+v0.2 Phase 1–2 adds a separate Tkinter UI launcher without modifying the proven audio/STT/VAD loop. It creates independent LEFT, CENTER, and RIGHT windows, discovers Windows displays through the Win32 monitor API, and assigns the primary display to LEFT. Additional displays are assigned deterministically to CENTER and RIGHT by their position. On a single display, all three roles safely fall back to the same monitor for development.
+
+Start the UI on Windows with:
+
+```text
+run_ayaka_ui.bat
+```
+
+The LEFT window is the AYAKA character placeholder, CENTER is the FieldRise dashboard with clock, system status, core pulse, SoundOn and YouTube placeholders, and RIGHT is the MOMOKA developer panel. The current UI state model already contains AYAKA/MOMOKA themes, STANDBY/LISTENING/THINKING/SPEAKING/EXECUTING/COMPLETE states, and HOME/SNS/SOUNDON/GITHUB navigation history for the next voice-command phase.
+
+The headless monitor mapping can be inspected without opening windows:
+
+```powershell
+py -3 -m ayaka.ui.launcher --print-layout
+```
+
+Linux validation covers monitor assignment, UI state, compilation, and the headless layout command. Actual Windows display enumeration and three-window placement require the user's Windows PC. The UI launcher is intentionally separate from `run_ayaka.bat`, which continues to launch the v0.1 voice service.
+
 ## VAD設定
 
 `config.json` の `vad` で調整できます。音量値は16-bit PCMのRMSスケールです。
@@ -142,6 +162,10 @@ VADテストでは、RMSによる発話開始、プリロール、無音終了�
 | `ayaka/benchmark_stt.py` | 同一WAVでsmall/base/tinyを比較するベンチマーク |
 | `ayaka/wake.py` | 日本語ウェイクワード検出 |
 | `ayaka/main.py` | 既存WAVの一回処理と連続実行 |
+| `ayaka/ui/monitors.py` | Windowsモニター検出とLEFT/CENTER/RIGHT割当 |
+| `ayaka/ui/state.py` | モード、状態、テーマ、Dashboard履歴 |
+| `ayaka/ui/app.py` | 3独立Tkinterウィンドウの描画 |
+| `ayaka/ui/launcher.py` | v0.2 UI起動とヘッドレス配置確認 |
 | `config.example.json` | 安全な設定テンプレート |
 | `run_ayaka.ps1` / `.bat` | Windows起動スクリプト |
 | `tests/test_core.py` / `test_vad.py` / `test_benchmark.py` | 外部デバイス不要のテスト |

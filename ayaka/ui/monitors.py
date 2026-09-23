@@ -1,0 +1,81 @@
+from dataclasses import dataclass
+import sys
+from typing import Callable
+
+
+@dataclass(frozen=True)
+class MonitorInfo:
+    name: str
+    x: int
+    y: int
+    width: int
+    height: int
+    primary: bool = False
+
+    @property
+    def right(self) -> int:
+        return self.x + self.width
+
+
+@dataclass(frozen=True)
+class MonitorLayout:
+    left: MonitorInfo
+    center: MonitorInfo
+    right: MonitorInfo
+
+
+def assign_monitors(monitors: list[MonitorInfo]) -> MonitorLayout:
+    if not monitors:
+        raise ValueError("At least one monitor is required")
+    primary = next((monitor for monitor in monitors if monitor.primary), monitors[0])
+    others = sorted((monitor for monitor in monitors if monitor != primary), key=lambda item: (item.x, item.y, item.name))
+    left = primary
+    center = others[0] if len(others) >= 1 else left
+    right = others[1] if len(others) >= 2 else center
+    return MonitorLayout(left=left, center=center, right=right)
+
+
+def _fallback_monitors() -> list[MonitorInfo]:
+    return [MonitorInfo("primary", 0, 0, 1280, 800, True)]
+
+
+def discover_monitors() -> list[MonitorInfo]:
+    """Discover Windows displays without making imports or tests Windows-only."""
+    if sys.platform != "win32":
+        return _fallback_monitors()
+    import ctypes
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32
+    monitors: list[MonitorInfo] = []
+    monitor_enum_proc = ctypes.WINFUNCTYPE(
+        ctypes.c_int,
+        wintypes.HMONITOR,
+        wintypes.HDC,
+        ctypes.POINTER(wintypes.RECT),
+        wintypes.LPARAM,
+    )
+
+    def callback(handle, _dc, rect_ptr, _data):
+        rect = rect_ptr.contents
+        info = wintypes.MONITORINFO()
+        info.cbSize = ctypes.sizeof(wintypes.MONITORINFO)
+        user32.GetMonitorInfoW(handle, ctypes.byref(info))
+        monitors.append(
+            MonitorInfo(
+                name=f"monitor-{len(monitors) + 1}",
+                x=rect.left,
+                y=rect.top,
+                width=rect.right - rect.left,
+                height=rect.bottom - rect.top,
+                primary=bool(info.dwFlags & 1),
+            )
+        )
+        return 1
+
+    user32.EnumDisplayMonitors(None, None, monitor_enum_proc(callback), 0)
+    return monitors or _fallback_monitors()
+
+
+def discover_layout(discover: Callable[[], list[MonitorInfo]] = discover_monitors) -> MonitorLayout:
+    return assign_monitors(discover())
