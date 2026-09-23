@@ -17,7 +17,7 @@ def monitor_geometry(monitor) -> str:
 
 
 class JarvisUiApp:
-    def __init__(self, layout: MonitorLayout | None = None, state: UiState | None = None):
+    def __init__(self, layout: MonitorLayout | None = None, state: UiState | None = None, on_ready=None):
         self.layout = layout or discover_layout()
         self.state = state or UiState()
         self.root: tk.Tk | None = None
@@ -25,6 +25,7 @@ class JarvisUiApp:
         self.labels: dict[str, tk.Label] = {}
         self.core_canvas: tk.Canvas | None = None
         self._pulse_phase = 0
+        self.on_ready = on_ready
 
     def _make_window(self, parent, title: str, monitor):
         window = parent if title == "AYAKA JARVIS LEFT" else tk.Toplevel(parent)
@@ -49,7 +50,7 @@ class JarvisUiApp:
 
     def _build_left(self, window):
         self._label(window, "FIELD RISE", size=14, color=MUTED, bold=True)
-        self._label(window, "AYAKA", size=38, color="#68e8ff", bold=True)
+        self.labels["left_title"] = self._label(window, "AYAKA", size=38, color="#68e8ff", bold=True)
         self._label(window, "SYSTEM CORE / VOICE INTERFACE", size=12, color=MUTED)
         character = tk.Frame(window, bg=PANEL, highlightbackground="#1c6682", highlightthickness=1)
         character.pack(fill="both", expand=True, padx=32, pady=28)
@@ -102,6 +103,7 @@ class JarvisUiApp:
         self.labels["status"].configure(text=f"SYSTEM / {self.state.system_state.value}")
         self.labels["page"].configure(text=f"CENTER / {self.state.page.value}")
         accent = self.state.theme_accent
+        self.labels["left_title"].configure(text="MOMOKA // DEVELOPER MODE" if self.state.mode is JarvisMode.MOMOKA else "AYAKA", fg=accent)
         self.labels["core"].configure(text=f"{self.state.theme_name} CORE", fg=accent)
         self.labels["status"].configure(fg=accent)
         if self.core_canvas:
@@ -121,6 +123,8 @@ class JarvisUiApp:
         self._build_left(self.windows["left"])
         self._build_center(self.windows["center"])
         self._build_right(self.windows["right"])
+        if self.on_ready:
+            self.on_ready(self)
         self.refresh()
         self.root.mainloop()
 

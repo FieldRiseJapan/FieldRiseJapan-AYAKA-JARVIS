@@ -87,6 +87,20 @@ py -3 -m ayaka.ui.launcher --print-layout
 
 Linux validation covers monitor assignment, UI state, compilation, and the headless layout command. Actual Windows display enumeration and three-window placement require the user's Windows PC. The UI launcher is intentionally separate from `run_ayaka.bat`, which continues to launch the v0.1 voice service.
 
+## v0.2 Phase 3–4: voice commands and mode switching
+
+The command router converts conservatively normalized Japanese transcripts into `WAKE`, `SLEEP`, `AYAKA_MODE`, `MOMOKA_MODE`, `HOME`, `BACK`, `SNS`, `SOUNDON`, `GITHUB`, or `UNKNOWN`. Alias forms such as `サウンドオン出して`, `ギットハブ見せて`, and `SNSのデータ見せて` are supported without broad substring matching, reducing accidental activations.
+
+For an integrated Windows test, use the new launcher:
+
+```text
+run_ayaka_jarvis.bat
+```
+
+This starts the three-monitor UI and a daemon voice worker. The worker performs the existing VAD and whisper.cpp flow, then places recognized text into a queue. Only the Tkinter main thread consumes that queue and updates UI state. `桃花` switches all three windows to the dark MOMOKA purple theme; `彩花` switches them back to AYAKA blue. `ホーム`, `戻って`, `SNS見せて`, `SoundOn見せて`, and `GitHub見せて` update the CENTER page model. `おやすみ` speaks the existing Windows TTS response and schedules UI shutdown.
+
+The existing `run_ayaka.bat` and `run_ayaka_ui.bat` launchers are unchanged. COEIROINK, idle timers, real dashboard data, character assets, and background wake-listener persistence remain later phases.
+
 ## VAD設定
 
 `config.json` の `vad` で調整できます。音量値は16-bit PCMのRMSスケールです。
@@ -166,6 +180,9 @@ VADテストでは、RMSによる発話開始、プリロール、無音終了�
 | `ayaka/ui/state.py` | モード、状態、テーマ、Dashboard履歴 |
 | `ayaka/ui/app.py` | 3独立Tkinterウィンドウの描画 |
 | `ayaka/ui/launcher.py` | v0.2 UI起動とヘッドレス配置確認 |
+| `ayaka/ui/controller.py` | IntentからUI状態への適用 |
+| `ayaka/ui/integrated.py` | Queue経由の音声Worker＋UI統合起動 |
+| `ayaka/commands.py` | 音声文字列のIntent変換 |
 | `config.example.json` | 安全な設定テンプレート |
 | `run_ayaka.ps1` / `.bat` | Windows起動スクリプト |
 | `tests/test_core.py` / `test_vad.py` / `test_benchmark.py` | 外部デバイス不要のテスト |
