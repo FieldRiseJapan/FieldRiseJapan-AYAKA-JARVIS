@@ -1,6 +1,19 @@
 from dataclasses import dataclass
+import ctypes
 import sys
 from typing import Callable
+from ctypes import wintypes
+
+
+class MonitorInfoStructure(ctypes.Structure):
+    """Win32 MONITORINFO; ctypes.wintypes does not provide this type."""
+
+    _fields_ = [
+        ("cbSize", wintypes.DWORD),
+        ("rcMonitor", wintypes.RECT),
+        ("rcWork", wintypes.RECT),
+        ("dwFlags", wintypes.DWORD),
+    ]
 
 
 @dataclass(frozen=True)
@@ -43,23 +56,20 @@ def discover_monitors() -> list[MonitorInfo]:
     """Discover Windows displays without making imports or tests Windows-only."""
     if sys.platform != "win32":
         return _fallback_monitors()
-    import ctypes
-    from ctypes import wintypes
-
     user32 = ctypes.windll.user32
     monitors: list[MonitorInfo] = []
     monitor_enum_proc = ctypes.WINFUNCTYPE(
         ctypes.c_int,
-        wintypes.HMONITOR,
-        wintypes.HDC,
+        getattr(wintypes, "HMONITOR", wintypes.HANDLE),
+        getattr(wintypes, "HDC", wintypes.HANDLE),
         ctypes.POINTER(wintypes.RECT),
         wintypes.LPARAM,
     )
 
     def callback(handle, _dc, rect_ptr, _data):
         rect = rect_ptr.contents
-        info = wintypes.MONITORINFO()
-        info.cbSize = ctypes.sizeof(wintypes.MONITORINFO)
+        info = MonitorInfoStructure()
+        info.cbSize = ctypes.sizeof(MonitorInfoStructure)
         user32.GetMonitorInfoW(handle, ctypes.byref(info))
         monitors.append(
             MonitorInfo(

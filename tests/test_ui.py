@@ -1,10 +1,16 @@
 import unittest
+import ctypes
 
-from ayaka.ui.monitors import MonitorInfo, assign_monitors
+from ayaka.ui.monitors import MonitorInfo, MonitorInfoStructure, assign_monitors
 from ayaka.ui.state import DashboardPage, JarvisMode, JarvisState, UiState
 
 
 class MonitorAssignmentTests(unittest.TestCase):
+    def test_win32_monitor_info_structure_has_required_fields(self):
+        field_names = [name for name, _type in MonitorInfoStructure._fields_]
+        self.assertEqual(field_names, ["cbSize", "rcMonitor", "rcWork", "dwFlags"])
+        self.assertGreater(ctypes.sizeof(MonitorInfoStructure), 0)
+
     def test_primary_and_portrait_landscape_monitors_are_assigned(self):
         monitors = [
             MonitorInfo("right", 1920, 0, 1920, 1080, False),
