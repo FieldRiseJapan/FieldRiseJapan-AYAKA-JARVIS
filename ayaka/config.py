@@ -13,9 +13,19 @@ class AudioConfig:
 
 
 @dataclass(frozen=True)
+class VadConfig:
+    enabled: bool = True
+    threshold: int = 500
+    silence_seconds: float = 0.8
+    pre_roll_seconds: float = 0.3
+    max_record_seconds: float = 12.0
+    block_seconds: float = 0.02
+
+
+@dataclass(frozen=True)
 class WhisperConfig:
-    executable: Path = Path("vendor/whisper.cpp/build/bin/Release/whisper-cli.exe")
-    model: Path = Path("models/ggml-small.bin")
+    executable: Path = Path("vendor/whisper.cpp/build-release-x64/bin/whisper-cli.exe")
+    model: Path = Path("vendor/whisper.cpp/ggml-small.bin")
     language: str = "ja"
     chunk_seconds: int = 5
     temperature: float = 0.0
@@ -24,6 +34,7 @@ class WhisperConfig:
 @dataclass(frozen=True)
 class AppConfig:
     audio: AudioConfig = AudioConfig()
+    vad: VadConfig = VadConfig()
     whisper: WhisperConfig = WhisperConfig()
     wake_words: tuple[str, ...] = ("彩花",)
     reply_text: str = "はい、社長。"

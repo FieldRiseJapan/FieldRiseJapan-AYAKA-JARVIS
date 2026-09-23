@@ -9,5 +9,7 @@ runtime/
 *.wav
 models/*.bin
 vendor/whisper.cpp/build/
+vendor/whisper.cpp/build-release-x64/
+vendor/whisper.cpp/ggml-*.bin
 vendor/whisper.cpp/.cache/
 .vscode/

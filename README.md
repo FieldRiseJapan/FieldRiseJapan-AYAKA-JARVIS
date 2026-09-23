@@ -1,6 +1,6 @@
 # AYAKA JARVIS — v0.1「彩花の耳」
 
-Python の Windows WASAPI 録音から whisper.cpp の日本語音声認識へ接続し、認識結果から「彩花」などのウェイクワードを検出する最小構成です。SDL2 の `whisper-stream` 録音経路は使用しません。
+Python の Windows WASAPI 録音から whisper.cpp の日本語音声認識へ接続し、音声区間を自動検出して「彩花」などのウェイクワードを判定する構成です。SDL2 の `whisper-stream` 録音経路は使用しません。
 
 ## v0.1 の構成
 
@@ -8,22 +8,22 @@ Python の Windows WASAPI 録音から whisper.cpp の日本語音声認識へ�
 Jabra Speak2 40 MS
         │ Windows WASAPI
         ▼
-Python sounddevice / recorder.py
-        │ 5秒 WAV
+Python sounddevice / VAD recorder
+        │ 発話開始・無音終了・WAV保存
         ▼
 whisper.cpp whisper-cli.exe + ggml-small.bin
         │ 日本語テキスト
         ▼
-WakeWordDetector（「彩花」）
+WakeWordDetector（「彩花」「おはよう」など）
         │
-        └── 任意: PowerShell System.Speech「はい、社長。」
+        └── 任意: PowerShell System.Speech 応答
 ```
 
-コードは後続の Speaker ID、LLM、TTS、UI を追加しやすいように、設定・録音・STT・ウェイクワード検出を分離しています。
+コードは後続の Speaker ID、LLM、TTS、UI を追加しやすいように、設定・録音・VAD・STT・ウェイクワード検出を分離しています。
 
 ## Windows セットアップ
 
-1. Python 3.13 64bit と whisper.cpp x64 ビルドを用意します。
+1. Python 3.13 64bit と whisper.cpp x64 Release ビルドを用意します。
 2. リポジトリ直下で仮想環境を作り、依存関係をインストールします。
 
 ```powershell
@@ -32,7 +32,7 @@ py -3 -m venv .venv
 Copy-Item config.example.json config.json
 ```
 
-3. `config.json` の `whisper.executable` と `whisper.model` を実際の配置に合わせます。大容量モデルはGitHubへコミットせず、ローカルの `models/` に置いてください。
+3. `config.json` の `whisper.executable` と `whisper.model` を実際の配置に合わせます。実機で確認済みの既定値は `vendor/whisper.cpp/build-release-x64/bin/whisper-cli.exe` と `vendor/whisper.cpp/ggml-small.bin` です。大容量モデルとビルド成果物はGitHubへコミットしません。
 4. 既定では `Jabra Speak2 40 MS` と `Windows WASAPI` を名前で自動検出します。検出できない場合だけ `audio.device_index` に確認済みの番号を設定します。デバイス番号はPC環境により変わるため、恒久的な識別子として扱わないでください。
 
 ## 起動
@@ -49,24 +49,50 @@ run_ayaka.bat
 .venv\Scripts\python.exe -m ayaka.main --config config.json --tts
 ```
 
-5秒ごとに録音して文字起こしし、コンソールへ次のように表示します。
+VAD有効時は、録音開始前に音声レベルを監視します。発話が始まるとプリロールを含めて録音し、設定時間の無音が続くと即座にWAVを保存してwhisper.cppへ渡します。発話が検出されない限り、空のWAVをwhisper.cppへ送信しません。
+
+表示例:
 
 ```text
-認識結果: 彩花、おはよう
-ウェイクワード検出: 彩花
+AYAKA JARVIS v0.1
+🎧 音声待機中...
+🎙️ 発話を検出しました
+🔴 録音中...
+⏹️ 発話終了を検出
+🧠 音声認識中...
+📝 認識結果: おはよう
+🔔 ウェイクワード検出: おはよう
+🗣️ AYAKA: おはようございます、社長。
 ```
 
-`--tts` を付けると、ウェイクワード検出時に Windows の `System.Speech` で「はい、社長。」と発話します。音声設定そのものは変更しません。
+`--tts` を付けると、ウェイクワード検出時に Windows の `System.Speech` で設定された応答を発話します。音声デバイス設定自体は変更しません。
+
+## VAD設定
+
+`config.json` の `vad` で調整できます。音量値は16-bit PCMのRMSスケールです。
+
+| 設定 | 既定値 | 意味 |
+|---|---:|---|
+| `enabled` | `true` | `false`にすると従来の固定録音へ戻す |
+| `threshold` | `500` | 発話開始と判定するRMS閾値 |
+| `silence_seconds` | `0.8` | 発話後、この秒数の無音で終了 |
+| `pre_roll_seconds` | `0.3` | 発話開始直前に保持する音声 |
+| `max_record_seconds` | `12.0` | 異常な長時間録音を防ぐ上限 |
+| `block_seconds` | `0.02` | 音量監視のチャンク長 |
+
+環境音で誤反応する場合は `threshold` を少し上げ、普通の声を取りこぼす場合は少し下げてください。会話の語尾が切れる場合は `silence_seconds` を長くします。
+
+`vad` が存在しない旧 `config.json` でも、上表のデフォルト値で起動します。`enabled: false` を設定すれば、既存の固定秒数録音へ戻せます。
 
 ## 既存WAVでの確認
 
-実機で作成済みの `ayaka_test.wav` を、マイクを使わずに確認できます。
+実機で作成済みのWAVを、マイクを使わずに確認できます。
 
 ```powershell
 .venv\Scripts\python.exe -m ayaka.main --config config.json --wav ayaka_test.wav
 ```
 
-この経路では、音声入力が正常に保存されているかと、whisper.cpp の日本語STTおよび「彩花」検出を分離して検証できます。
+この経路では、録音とSTTおよびウェイクワード判定を分離して検証できます。
 
 ## テスト
 
@@ -76,21 +102,22 @@ run_ayaka.bat
 python -m unittest discover -s tests -v
 ```
 
-テスト対象は、名前・WASAPI・入力チャンネルによるデバイス選択、全角・空白・句読点を含むウェイクワード検出、既定設定です。録音とwhisper.cppは実機依存のため、`--wav` の手動確認を別途行います。
+VADテストでは、RMSによる発話開始、プリロール、無音終了、最大録音時間、発話なし時の抑制、設定の後方互換性を確認します。Windows + Jabra実機の最終確認は、音声デバイスを接続したWindows PCで別途行います。
 
 ## ファイル構成
 
 | ファイル | 役割 |
 |---|---|
-| `ayaka/config.py` | 音声・whisper・アプリ設定の型付き定義 |
+| `ayaka/config.py` | 音声・VAD・whisper・アプリ設定の型付き定義 |
 | `ayaka/devices.py` | WASAPIホストAPIと入力デバイスの自動検出 |
-| `ayaka/recorder.py` | sounddeviceによるWAV録音 |
+| `ayaka/recorder.py` | 固定録音またはVAD録音によるWAV保存 |
+| `ayaka/vad.py` | ハードウェア非依存のRMS VAD状態機械 |
 | `ayaka/stt.py` | whisper.cpp `whisper-cli` 呼び出し |
 | `ayaka/wake.py` | 日本語ウェイクワード検出 |
 | `ayaka/main.py` | 既存WAVの一回処理と連続実行 |
 | `config.example.json` | 安全な設定テンプレート |
 | `run_ayaka.ps1` / `.bat` | Windows起動スクリプト |
-| `tests/test_core.py` | 外部デバイス不要のコアテスト |
+| `tests/test_core.py` / `test_vad.py` | 外部デバイス不要のテスト |
 
 ## トラブルシューティング
 
@@ -98,17 +125,17 @@ python -m unittest discover -s tests -v
 
 Windowsの「サウンド入力」でJabraが入力デバイスとして有効か確認してください。`config.json` の名前は部分一致で評価されます。WASAPIの表示名が異なる場合は `hostapi_name` と `device_name` を修正してください。番号を設定する場合も、毎回 `sounddevice.query_devices()` で確認してください。
 
+### VADが発話を検出しない／環境音に反応する
+
+`threshold` を調整してください。まず `500` を基準にし、検出しない場合は下げ、環境音に反応する場合は上げます。語頭が欠ける場合は `pre_roll_seconds` を増やします。語尾が切れる場合は `silence_seconds` を増やします。
+
 ### whisper実行ファイルまたはモデルが見つからない
 
 エラーメッセージに表示されたパスを確認し、`config.json` の相対パスがリポジトリ直下から正しいことを確認してください。モデルファイル、`vendor/whisper.cpp` のビルド成果物、WAVはGitHubへ追加しません。
 
 ### 無音のWAVになる
 
-SDL2経路へ戻らず、PythonのWASAPI経路を使用してください。`ayaka_latest.wav` をWindowsで再生して無音なら、Jabraの入力選択、Windowsのマイク権限、他アプリによる占有を確認します。
-
-### 認識精度が低い
-
-まず `--wav ayaka_test.wav` で録音とSTTを切り分けます。5秒チャンク、16kHz、1chを基準にし、モデルやチャンク長の変更は一度に一つだけ行ってください。
+SDL2経路へ戻らず、PythonのWASAPI経路を使用してください。`ayaka_latest.wav` をWindowsで再生して無音なら、Jabraの入力選択、Windowsのマイク権限、他アプリによる占有を確認します。必要なら一時的に `vad.enabled` を `false` にして、従来の固定録音で入力経路を切り分けます。
 
 ## セキュリティとGit管理
 

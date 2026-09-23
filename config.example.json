@@ -7,13 +7,21 @@
     "channels": 1,
     "chunk_seconds": 5
   },
+  "vad": {
+    "enabled": true,
+    "threshold": 500,
+    "silence_seconds": 0.8,
+    "pre_roll_seconds": 0.3,
+    "max_record_seconds": 12.0,
+    "block_seconds": 0.02
+  },
   "whisper": {
-    "executable": "vendor/whisper.cpp/build/bin/Release/whisper-cli.exe",
-    "model": "models/ggml-small.bin",
+    "executable": "vendor/whisper.cpp/build-release-x64/bin/whisper-cli.exe",
+    "model": "vendor/whisper.cpp/ggml-small.bin",
     "language": "ja",
     "chunk_seconds": 5,
     "temperature": 0.0
   },
-  "wake_words": ["彩花"],
-  "reply_text": "はい、社長。"
+  "wake_words": ["彩花", "おはよう"],
+  "reply_text": "おはようございます、社長。"
 }
