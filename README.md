@@ -94,6 +94,32 @@ AYAKA JARVIS v0.1
 
 この経路では、録音とSTTおよびウェイクワード判定を分離して検証できます。
 
+## STTモデル比較ベンチマーク
+
+Windows実機で録音した同じWAVに対して、multilingual版の `small`、`base`、`tiny` を比較できます。
+
+```powershell
+.venv\Scripts\python.exe -m ayaka.benchmark_stt runtime\ayaka_latest.wav --config config.json
+```
+
+既定では、設定されたモデルと同じディレクトリにある次の3ファイルを順番に探します。
+
+```text
+vendor/whisper.cpp/ggml-small.bin
+vendor/whisper.cpp/ggml-base.bin
+vendor/whisper.cpp/ggml-tiny.bin
+```
+
+`ggml-base.bin` と `ggml-tiny.bin` が未配置の場合は、そのモデルだけ `ERROR` と終了コード `2` で表示されます。モデルはwhisper.cpp公式系の配布物からWindows側へ手動で取得し、`vendor/whisper.cpp/` 配下へ配置してください。自動ダウンロードは行わず、モデルファイルはGitHubへコミットしません。
+
+別のパスを比較する場合は、カンマ区切りで指定できます。
+
+```powershell
+.venv\Scripts\python.exe -m ayaka.benchmark_stt runtime\ayaka_latest.wav --models vendor\whisper.cpp\ggml-small.bin,vendor\whisper.cpp\ggml-base.bin,vendor\whisper.cpp\ggml-tiny.bin
+```
+
+各モデルについて、モデル名、実行時間、音声長、RTF、認識結果、whisper.cppの終了コードを表示します。Linux側では実機音声の速度・精度を断定せず、最終モデルは社長の声を録音した同一WAVでWindows実機比較を行ってください。
+
 ## テスト
 
 外部音声デバイスを必要としないユニットテストを実行します。
@@ -113,11 +139,12 @@ VADテストでは、RMSによる発話開始、プリロール、無音終了�
 | `ayaka/recorder.py` | 固定録音またはVAD録音によるWAV保存 |
 | `ayaka/vad.py` | ハードウェア非依存のRMS VAD状態機械 |
 | `ayaka/stt.py` | whisper.cpp `whisper-cli` 呼び出し |
+| `ayaka/benchmark_stt.py` | 同一WAVでsmall/base/tinyを比較するベンチマーク |
 | `ayaka/wake.py` | 日本語ウェイクワード検出 |
 | `ayaka/main.py` | 既存WAVの一回処理と連続実行 |
 | `config.example.json` | 安全な設定テンプレート |
 | `run_ayaka.ps1` / `.bat` | Windows起動スクリプト |
-| `tests/test_core.py` / `test_vad.py` | 外部デバイス不要のテスト |
+| `tests/test_core.py` / `test_vad.py` / `test_benchmark.py` | 外部デバイス不要のテスト |
 
 ## トラブルシューティング
 
