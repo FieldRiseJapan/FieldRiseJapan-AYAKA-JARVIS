@@ -2,8 +2,8 @@ from datetime import datetime
 import tkinter as tk
 from tkinter import ttk
 
+from .dashboard import CARD_GRID_COLUMNS, CARD_GRID_ROWS, CENTER_CARDS, CENTER_CORE_SIZE
 from .monitors import MonitorLayout, discover_layout
-from .dashboard import CENTER_CARDS
 from .state import DashboardPage, JarvisMode, UiState
 
 
@@ -63,28 +63,30 @@ class JarvisUiApp:
     def _build_center(self, window):
         self._label(window, "FIELD RISE // AYAKA JARVIS", size=18, color="#68e8ff", bold=True)
         self.labels["datetime"] = self._label(window, "", size=15, color=MUTED)
+        self.labels["status"] = self._label(window, "SYSTEM ONLINE / STANDBY", size=18, color="#68e8ff", bold=True)
         core = tk.Frame(window, bg=PANEL, highlightbackground="#1c6682", highlightthickness=1)
-        core.pack(fill="x", padx=32, pady=24)
-        self.core_canvas = tk.Canvas(core, width=260, height=220, bg=PANEL, highlightthickness=0)
-        self.core_canvas.pack(pady=12)
+        core.pack(fill="both", expand=True, padx=32, pady=(20, 12))
+        self.core_canvas = tk.Canvas(core, width=CENTER_CORE_SIZE[0], height=CENTER_CORE_SIZE[1], bg=PANEL, highlightthickness=0)
+        self.core_canvas.pack(fill="both", expand=True, padx=16, pady=16)
         self.labels["core"] = tk.Label(core, text="AYAKA CORE", fg="#68e8ff", bg=PANEL, font=("Consolas", 18, "bold"))
         self.labels["core"].pack(pady=(0, 22))
-        self.labels["status"] = self._label(window, "SYSTEM / STANDBY", size=18, color="#68e8ff", bold=True)
         self.labels["page"] = self._label(window, "HOME", size=14, color=MUTED)
         metrics = tk.Frame(window, bg=BACKGROUND)
-        metrics.pack(fill="both", expand=True, padx=32, pady=16)
+        metrics.pack(fill="x", padx=32, pady=(8, 28))
+        for row in range(CARD_GRID_ROWS):
+            metrics.grid_rowconfigure(row, weight=1, minsize=74)
+        for column in range(CARD_GRID_COLUMNS):
+            metrics.grid_columnconfigure(column, weight=1, uniform="dashboard-card")
         for index, card in enumerate(CENTER_CARDS):
-            row, column = divmod(index, 2)
-            metrics.grid_rowconfigure(row, weight=1)
-            metrics.grid_columnconfigure(column, weight=1)
+            row, column = divmod(index, CARD_GRID_COLUMNS)
             box = tk.Frame(metrics, bg=PANEL, highlightbackground="#153c55", highlightthickness=1)
             box.grid(row=row, column=column, sticky="nsew", padx=8, pady=8)
-            title_label = tk.Label(box, text=card.title, fg=MUTED, bg=PANEL, font=("Consolas", 16, "bold"), anchor="w")
-            title_label.pack(fill="x", padx=18, pady=(18, 4))
-            metric_label = tk.Label(box, text=card.metric, fg=MUTED, bg=PANEL, font=("Consolas", 11), anchor="w")
-            metric_label.pack(fill="x", padx=18, pady=2)
-            value_label = tk.Label(box, text=card.value, fg=TEXT, bg=PANEL, font=("Consolas", 20, "bold"), anchor="w")
-            value_label.pack(fill="x", padx=18, pady=(4, 18))
+            title_label = tk.Label(box, text=card.title, fg=MUTED, bg=PANEL, font=("Consolas", 11, "bold"), anchor="w")
+            title_label.pack(fill="x", padx=14, pady=(8, 1))
+            metric_label = tk.Label(box, text=card.metric, fg=MUTED, bg=PANEL, font=("Consolas", 9), anchor="w")
+            metric_label.pack(fill="x", padx=14, pady=1)
+            value_label = tk.Label(box, text=card.value, fg=TEXT, bg=PANEL, font=("Consolas", 12, "bold"), anchor="w")
+            value_label.pack(fill="x", padx=14, pady=(1, 8))
             self.dashboard_card_frames.append(box)
             self.dashboard_card_labels.append((title_label, metric_label, value_label))
 
@@ -126,10 +128,15 @@ class JarvisUiApp:
         if self.core_canvas:
             self.core_canvas.delete("all")
             self._pulse_phase = (self._pulse_phase + 1) % 40
-            radius = 62 + (self._pulse_phase if self._pulse_phase <= 20 else 40 - self._pulse_phase)
-            center_x, center_y = 130, 105
-            self.core_canvas.create_oval(center_x - radius, center_y - radius, center_x + radius, center_y + radius, outline=accent, width=3)
-            self.core_canvas.create_oval(center_x - 30, center_y - 30, center_x + 30, center_y + 30, fill=accent, outline=accent)
+            width = max(self.core_canvas.winfo_width(), CENTER_CORE_SIZE[0])
+            height = max(self.core_canvas.winfo_height(), CENTER_CORE_SIZE[1])
+            center_x, center_y = width // 2, height // 2
+            pulse = self._pulse_phase if self._pulse_phase <= 20 else 40 - self._pulse_phase
+            radius = min(width, height) // 4 + pulse
+            for ring_radius, ring_width in ((radius + 52, 2), (radius + 28, 2), (radius, 4)):
+                self.core_canvas.create_oval(center_x - ring_radius, center_y - ring_radius, center_x + ring_radius, center_y + ring_radius, outline=accent, width=ring_width)
+            core_radius = max(56, radius // 2)
+            self.core_canvas.create_oval(center_x - core_radius, center_y - core_radius, center_x + core_radius, center_y + core_radius, fill=accent, outline=accent)
         self.root.after(500, self.refresh)
 
     def run(self):

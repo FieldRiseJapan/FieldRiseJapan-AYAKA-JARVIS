@@ -16,6 +16,23 @@ class Intent(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
+# Keep real-device Whisper name variants separate from ordinary commands so
+# future field-log additions remain easy to review and do not broaden commands.
+MOMOKA_NAME_ALIASES = (
+    "桃花", "ももか", "モモカ", "もも", "モモ", "まもか", "まもかぁ",
+    "ももかわ", "モモカー", "もうもう", "もうもうか", "モモンカー",
+    "モンモンカー", "おもが",
+)
+AYAKA_NAME_ALIASES = (
+    "彩花", "あやか", "アヤカ", "あやかぁ", "あや", "アヤ", "おやか",
+    "あうや", "アイアー",
+)
+NAME_MODE_ALIASES = {
+    Intent.MOMOKA_MODE: MOMOKA_NAME_ALIASES,
+    Intent.AYAKA_MODE: AYAKA_NAME_ALIASES,
+}
+
+
 def normalize_transcript(text: str) -> str:
     normalized = unicodedata.normalize("NFKC", text).casefold()
     return re.sub(r"[\s。、！？!?.,:：；;「」『』（）()]+", "", normalized)
@@ -25,8 +42,7 @@ class CommandRouter:
     _aliases = {
         Intent.WAKE: ("おはよう",),
         Intent.SLEEP: ("おやすみ",),
-        Intent.AYAKA_MODE: ("彩花", "あや"),
-        Intent.MOMOKA_MODE: ("桃花", "もも"),
+        **NAME_MODE_ALIASES,
         Intent.HOME: ("ホーム",),
         Intent.BACK: ("戻って",),
         Intent.SNS: ("sns見せて", "sns出して", "snsのデータ見せて"),

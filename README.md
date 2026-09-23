@@ -99,7 +99,9 @@ run_ayaka_jarvis.bat
 
 This starts the three-monitor UI and a daemon voice worker. The worker performs the existing VAD and whisper.cpp flow, then places recognized text into a queue. Only the Tkinter main thread consumes that queue and updates UI state. `桃花` switches all three windows to the dark MOMOKA purple theme; `彩花` switches them back to AYAKA blue. `ホーム`, `戻って`, `SNS見せて`, `SoundOn見せて`, and `GitHub見せて` update the CENTER page model. `おやすみ` speaks the existing Windows TTS response and schedules UI shutdown.
 
-The router also accepts the short recognition forms `あや` for AYAKA mode and `もも` for MOMOKA mode. The CENTER HOME dashboard now uses a spacious 2×2 card grid for SoundOn (今月収益), YouTube (直近28日再生), TikTok (直近7日再生), and Instagram (直近30日リーチ). TikTok and Instagram currently display `-- / DATA WAITING`; no social API is connected in this phase. All four card accents follow the active AYAKA blue/cyan or MOMOKA purple/violet theme.
+The router keeps a dedicated field-tested name-alias dictionary. MOMOKA aliases are `桃花`, `ももか`, `モモカ`, `もも`, `モモ`, `まもか`, `まもかぁ`, `ももかわ`, `モモカー`, `もうもう`, `もうもうか`, `モモンカー`, `モンモンカー`, and `おもが`. AYAKA aliases are `彩花`, `あやか`, `アヤカ`, `あやかぁ`, `あや`, `アヤ`, `おやか`, `あうや`, and `アイアー`. Ambiguous field-log words such as `（笑）`, `[音楽]`, `はっ`, `まんま`, `かあ`, and `ご覧` are intentionally excluded.
+
+The CENTER HOME dashboard is CORE-first: a large animated blue/cyan or purple/violet CORE occupies the vertical monitor's middle, while compact cards are grouped at the bottom in a 2×2 grid for SoundOn (今月収益), YouTube (直近28日再生), TikTok (直近7日再生), and Instagram (直近30日リーチ). TikTok and Instagram currently display `-- / DATA WAITING`; no social API is connected in this phase. The lightweight animation draws a pulsing sphere with multiple rings and can later be replaced by a higher-quality CORE renderer.
 
 The existing `run_ayaka.bat` and `run_ayaka_ui.bat` launchers are unchanged. COEIROINK, idle timers, real dashboard data, character assets, and background wake-listener persistence remain later phases.
 
@@ -185,10 +187,10 @@ VADテストでは、RMSによる発話開始、プリロール、無音終了�
 | `ayaka/ui/controller.py` | IntentからUI状態への適用 |
 | `ayaka/ui/integrated.py` | Queue経由の音声Worker＋UI統合起動 |
 | `ayaka/ui/dashboard.py` | CENTER HOMEの4カード定義とプレースホルダー |
-| `ayaka/commands.py` | 音声文字列のIntent変換 |
+| `ayaka/commands.py` | 音声文字列のIntent変換と実機名前Alias辞書 |
 | `config.example.json` | 安全な設定テンプレート |
 | `run_ayaka.ps1` / `.bat` | Windows起動スクリプト |
-| `tests/test_core.py` / `test_vad.py` / `test_benchmark.py` | 外部デバイス不要のテスト |
+| `tests/test_core.py` / `test_vad.py` / `test_benchmark.py` / `test_core_redesign.py` | 外部デバイス不要のテスト |
 
 ## トラブルシューティング
 
