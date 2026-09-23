@@ -23,6 +23,9 @@
     "temperature": 0.0
   },
   "animation": {
+    "enabled": true,
+    "blink_enabled": true,
+    "lipsync_enabled": true,
     "breathing_enabled": false,
     "breathing_amplitude_px": 1,
     "breathing_period_seconds": 4.0,

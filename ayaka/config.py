@@ -33,6 +33,9 @@ class WhisperConfig:
 
 @dataclass(frozen=True)
 class AnimationConfig:
+    enabled: bool = True
+    blink_enabled: bool = True
+    lipsync_enabled: bool = True
     breathing_enabled: bool = False
     breathing_amplitude_px: int = 1
     breathing_period_seconds: float = 4.0

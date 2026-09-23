@@ -1,11 +1,37 @@
 import unittest
 
 from ayaka.config import AnimationConfig
-from ayaka.ui.animation import AnimationController, BlinkPhase
+from ayaka.ui.animation import AnimationController, BlinkPhase, MouthShape
 from ayaka.ui.state import JarvisState
 
 
 class AnimationControllerTests(unittest.TestCase):
+    def test_discrete_mouth_shapes_and_non_speaking_reset(self):
+        controller = AnimationController(clock=lambda: 0.0, blink_interval=lambda: 4.0)
+        observed = []
+        for level in (0.0, 0.1, 0.4, 0.9):
+            controller.set_speaking_level(level)
+            observed.append(controller.update(JarvisState.SPEAKING, now=0.0).mouth_shape)
+        self.assertEqual(observed, [MouthShape.CLOSED, MouthShape.SMALL, MouthShape.MEDIUM, MouthShape.OPEN])
+        self.assertEqual(controller.update(JarvisState.EXECUTING, now=0.0).mouth_shape, MouthShape.CLOSED)
+        controller.set_speaking_level(1.0)
+        self.assertEqual(controller.update(JarvisState.SPEAKING, now=0.0).mouth_shape, MouthShape.OPEN)
+        controller.reset()
+        self.assertEqual(controller.update(JarvisState.SPEAKING, now=0.0).mouth_shape, MouthShape.CLOSED)
+
+    def test_independent_flags_and_invalid_audio_close_safely(self):
+        config = AnimationConfig(blink_enabled=False, lipsync_enabled=False, breathing_enabled=True)
+        controller = AnimationController(config, clock=lambda: 0.0, blink_interval=lambda: 0.1)
+        controller.set_speaking_level(float('nan'))
+        self.assertEqual(controller.update(JarvisState.SPEAKING, now=1.0).mouth_shape, MouthShape.CLOSED)
+        controller.set_speaking_level(1.0)
+        frame = controller.update(JarvisState.SPEAKING, now=1.0)
+        self.assertEqual(frame.blink_phase, BlinkPhase.OPEN)
+        self.assertEqual(frame.mouth_shape, MouthShape.CLOSED)
+        self.assertNotEqual(frame.vertical_offset_px, 0)
+        disabled = AnimationController(AnimationConfig(enabled=False, breathing_enabled=True), clock=lambda: 0.0)
+        self.assertEqual(disabled.update(JarvisState.SPEAKING, now=1.0).vertical_offset_px, 0)
+
     def test_speaking_state_exposes_and_clears_clamped_audio_level(self):
         controller = AnimationController(
             AnimationConfig(),

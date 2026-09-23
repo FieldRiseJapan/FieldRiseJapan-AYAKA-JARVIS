@@ -20,6 +20,13 @@ class BlinkPhase(str, Enum):
     CLOSED = "CLOSED"
 
 
+class MouthShape(str, Enum):
+    CLOSED = "CLOSED"
+    SMALL = "SMALL"
+    MEDIUM = "MEDIUM"
+    OPEN = "OPEN"
+
+
 @dataclass(frozen=True)
 class AnimationFrame:
     state: JarvisState
@@ -27,6 +34,7 @@ class AnimationFrame:
     blink_phase: BlinkPhase = BlinkPhase.OPEN
     mouth_open: float = 0.0
     speaking: bool = False
+    mouth_shape: MouthShape = MouthShape.CLOSED
 
 
 class CharacterAnimationProvider(Protocol):
@@ -58,21 +66,43 @@ class AnimationController:
         self._speaking_level = 0.0
 
     def set_speaking_level(self, level: float) -> None:
-        self._speaking_level = min(1.0, max(0.0, float(level)))
+        try:
+            value = float(level)
+            self._speaking_level = min(1.0, max(0.0, value)) if math.isfinite(value) else 0.0
+        except (TypeError, ValueError):
+            self._speaking_level = 0.0
+
+    def reset(self) -> None:
+        self._speaking_level = 0.0
+        self._state = JarvisState.STANDBY
+        self._started_at = self._clock()
+        self._next_blink_at = self._started_at + max(0.1, self._blink_interval())
 
     def update(self, state: JarvisState, *, now: float | None = None) -> AnimationFrame:
         current_time = self._clock() if now is None else now
         if self._state is JarvisState.SPEAKING and state is not JarvisState.SPEAKING:
             self._speaking_level = 0.0
         self._state = state
-        speaking = state is JarvisState.SPEAKING
+        speaking = self.config.enabled and state is JarvisState.SPEAKING
+        level = self._speaking_level if speaking and self.config.lipsync_enabled else 0.0
         return AnimationFrame(
             state=state,
-            vertical_offset_px=self._breathing_offset(current_time),
-            blink_phase=self._blink_phase(current_time),
-            mouth_open=self._speaking_level if speaking else 0.0,
+            vertical_offset_px=self._breathing_offset(current_time) if self.config.enabled else 0,
+            blink_phase=self._blink_phase(current_time) if self.config.enabled and self.config.blink_enabled else BlinkPhase.OPEN,
+            mouth_open=level,
             speaking=speaking,
+            mouth_shape=self._mouth_shape(level),
         )
+
+    @staticmethod
+    def _mouth_shape(level: float) -> MouthShape:
+        if level <= 0:
+            return MouthShape.CLOSED
+        if level < 0.33:
+            return MouthShape.SMALL
+        if level < 0.66:
+            return MouthShape.MEDIUM
+        return MouthShape.OPEN
 
     def _breathing_offset(self, now: float) -> int:
         amplitude = self.config.safe_breathing_amplitude_px

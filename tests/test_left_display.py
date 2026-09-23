@@ -1,5 +1,6 @@
 import hashlib
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from ayaka.ui.left_display import (
@@ -63,6 +64,25 @@ class LeftDisplayAssetTests(unittest.TestCase):
 
 
 class StaticImageAnimationProviderTests(unittest.TestCase):
+    def test_invalid_png_uses_fallback_without_crashing(self):
+        class FakeFrame:
+            def __init__(self):
+                self.raised = False
+
+            def place(self, **_kwargs):
+                pass
+
+            def lift(self):
+                self.raised = True
+
+        frame = FakeFrame()
+        display = LeftDisplay(parent=None, monitor_size=(1920, 1040))
+        with patch.object(type(display), 'image_available', new_callable=lambda: property(lambda _self: True)):
+            with patch.object(display, '_mount_image', side_effect=OSError('bad PNG')):
+                display.mount(lambda _parent: frame)
+        self.assertTrue(frame.raised)
+        self.assertIsNone(display.image_label)
+
     def test_provider_applies_only_whole_character_vertical_offset(self):
         class FakeLabel:
             def __init__(self):

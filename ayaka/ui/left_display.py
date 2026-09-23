@@ -89,8 +89,13 @@ class LeftDisplay:
         self.fallback_frame = fallback_factory(self.parent)
         self.fallback_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
         if self.image_available:
-            self._mount_image()
-            self.hud.mount()
+            try:
+                self._mount_image()
+                self.hud.mount()
+            except (OSError, ValueError, RuntimeError):
+                self.image_label = None
+                self.animation_provider = None
+                self.fallback_frame.lift()
         else:
             self.fallback_frame.lift()
 
@@ -139,6 +144,7 @@ class LeftDisplay:
             self.reset_animation()
 
     def reset_animation(self) -> None:
+        self.animation_controller.reset()
         if self.animation_provider is None:
             return
         try:
