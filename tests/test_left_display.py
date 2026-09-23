@@ -7,7 +7,12 @@ from ayaka.ui.left_display import (
     fit_cover_size,
     resolve_ayaka_asset,
 )
-from ayaka.ui.left_hud import HUD_STATES, HudStatusModel, calculate_hud_bounds
+from ayaka.ui.left_hud import (
+    HUD_STATES,
+    HudStatusModel,
+    LeftHudOverlay,
+    calculate_hud_bounds,
+)
 from ayaka.ui.state import JarvisState
 from ayaka.ui.monitors import MonitorInfo
 
@@ -41,6 +46,38 @@ class LeftDisplayAssetTests(unittest.TestCase):
 
 
 class LeftHudTests(unittest.TestCase):
+    def test_show_raises_canvas_widget_without_calling_canvas_item_lift(self):
+        class FakeTk:
+            def __init__(self):
+                self.calls = []
+
+            def call(self, *args):
+                self.calls.append(args)
+
+        class FakeCanvas:
+            _w = ".!canvas"
+
+            def __init__(self):
+                self.tk = FakeTk()
+                self.placements = []
+
+            def place(self, **kwargs):
+                self.placements.append(kwargs)
+
+            def lift(self):
+                raise AssertionError("Canvas.lift() raises canvas items, not the widget")
+
+        overlay = LeftHudOverlay(parent=None, display_size=(1000, 500))
+        overlay.canvas = FakeCanvas()
+
+        overlay.show()
+
+        self.assertEqual(
+            overlay.canvas.placements,
+            [{"x": 80, "y": 420, "width": 840, "height": 65}],
+        )
+        self.assertEqual(overlay.canvas.tk.calls, [("raise", ".!canvas", None)])
+
     def test_only_current_operational_state_is_active(self):
         model = HudStatusModel.from_state(JarvisState.THINKING)
 

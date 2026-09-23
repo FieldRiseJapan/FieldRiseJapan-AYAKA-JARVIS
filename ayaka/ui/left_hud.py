@@ -115,7 +115,7 @@ class LeftHudOverlay:
         if self.canvas is not None:
             left, top, right, bottom = calculate_hud_bounds(self.display_size)
             self.canvas.place(x=left, y=top, width=right - left, height=bottom - top)
-            self.canvas.lift()
+            tk.Misc.tkraise(self.canvas)
 
     def hide(self) -> None:
         if self.canvas is not None:
