@@ -25,8 +25,8 @@ class CommandRouter:
     _aliases = {
         Intent.WAKE: ("おはよう",),
         Intent.SLEEP: ("おやすみ",),
-        Intent.AYAKA_MODE: ("彩花",),
-        Intent.MOMOKA_MODE: ("桃花",),
+        Intent.AYAKA_MODE: ("彩花", "あや"),
+        Intent.MOMOKA_MODE: ("桃花", "もも"),
         Intent.HOME: ("ホーム",),
         Intent.BACK: ("戻って",),
         Intent.SNS: ("sns見せて", "sns出して", "snsのデータ見せて"),

@@ -99,6 +99,8 @@ run_ayaka_jarvis.bat
 
 This starts the three-monitor UI and a daemon voice worker. The worker performs the existing VAD and whisper.cpp flow, then places recognized text into a queue. Only the Tkinter main thread consumes that queue and updates UI state. `桃花` switches all three windows to the dark MOMOKA purple theme; `彩花` switches them back to AYAKA blue. `ホーム`, `戻って`, `SNS見せて`, `SoundOn見せて`, and `GitHub見せて` update the CENTER page model. `おやすみ` speaks the existing Windows TTS response and schedules UI shutdown.
 
+The router also accepts the short recognition forms `あや` for AYAKA mode and `もも` for MOMOKA mode. The CENTER HOME dashboard now uses a spacious 2×2 card grid for SoundOn (今月収益), YouTube (直近28日再生), TikTok (直近7日再生), and Instagram (直近30日リーチ). TikTok and Instagram currently display `-- / DATA WAITING`; no social API is connected in this phase. All four card accents follow the active AYAKA blue/cyan or MOMOKA purple/violet theme.
+
 The existing `run_ayaka.bat` and `run_ayaka_ui.bat` launchers are unchanged. COEIROINK, idle timers, real dashboard data, character assets, and background wake-listener persistence remain later phases.
 
 ## VAD設定
@@ -182,6 +184,7 @@ VADテストでは、RMSによる発話開始、プリロール、無音終了�
 | `ayaka/ui/launcher.py` | v0.2 UI起動とヘッドレス配置確認 |
 | `ayaka/ui/controller.py` | IntentからUI状態への適用 |
 | `ayaka/ui/integrated.py` | Queue経由の音声Worker＋UI統合起動 |
+| `ayaka/ui/dashboard.py` | CENTER HOMEの4カード定義とプレースホルダー |
 | `ayaka/commands.py` | 音声文字列のIntent変換 |
 | `config.example.json` | 安全な設定テンプレート |
 | `run_ayaka.ps1` / `.bat` | Windows起動スクリプト |

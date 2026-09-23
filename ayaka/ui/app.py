@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from .monitors import MonitorLayout, discover_layout
+from .dashboard import CENTER_CARDS
 from .state import DashboardPage, JarvisMode, UiState
 
 
@@ -23,6 +24,8 @@ class JarvisUiApp:
         self.root: tk.Tk | None = None
         self.windows: dict[str, tk.Misc] = {}
         self.labels: dict[str, tk.Label] = {}
+        self.dashboard_card_frames: list[tk.Frame] = []
+        self.dashboard_card_labels: list[tuple[tk.Label, tk.Label, tk.Label]] = []
         self.core_canvas: tk.Canvas | None = None
         self._pulse_phase = 0
         self.on_ready = on_ready
@@ -70,11 +73,20 @@ class JarvisUiApp:
         self.labels["page"] = self._label(window, "HOME", size=14, color=MUTED)
         metrics = tk.Frame(window, bg=BACKGROUND)
         metrics.pack(fill="both", expand=True, padx=32, pady=16)
-        for title, value in (("SoundOn / THIS MONTH", "—"), ("YouTube / LAST 28 DAYS", "—")):
+        for index, card in enumerate(CENTER_CARDS):
+            row, column = divmod(index, 2)
+            metrics.grid_rowconfigure(row, weight=1)
+            metrics.grid_columnconfigure(column, weight=1)
             box = tk.Frame(metrics, bg=PANEL, highlightbackground="#153c55", highlightthickness=1)
-            box.pack(fill="x", pady=8)
-            tk.Label(box, text=title, fg=MUTED, bg=PANEL, font=("Consolas", 11, "bold"), anchor="w").pack(fill="x", padx=16, pady=(12, 2))
-            tk.Label(box, text=value, fg=TEXT, bg=PANEL, font=("Consolas", 24, "bold"), anchor="w").pack(fill="x", padx=16, pady=(0, 12))
+            box.grid(row=row, column=column, sticky="nsew", padx=8, pady=8)
+            title_label = tk.Label(box, text=card.title, fg=MUTED, bg=PANEL, font=("Consolas", 16, "bold"), anchor="w")
+            title_label.pack(fill="x", padx=18, pady=(18, 4))
+            metric_label = tk.Label(box, text=card.metric, fg=MUTED, bg=PANEL, font=("Consolas", 11), anchor="w")
+            metric_label.pack(fill="x", padx=18, pady=2)
+            value_label = tk.Label(box, text=card.value, fg=TEXT, bg=PANEL, font=("Consolas", 20, "bold"), anchor="w")
+            value_label.pack(fill="x", padx=18, pady=(4, 18))
+            self.dashboard_card_frames.append(box)
+            self.dashboard_card_labels.append((title_label, metric_label, value_label))
 
     def _build_right(self, window):
         self._label(window, "MOMOKA // DEVELOPER", size=22, color="#b56cff", bold=True)
@@ -106,6 +118,11 @@ class JarvisUiApp:
         self.labels["left_title"].configure(text="MOMOKA // DEVELOPER MODE" if self.state.mode is JarvisMode.MOMOKA else "AYAKA", fg=accent)
         self.labels["core"].configure(text=f"{self.state.theme_name} CORE", fg=accent)
         self.labels["status"].configure(fg=accent)
+        for frame, (title_label, metric_label, value_label) in zip(self.dashboard_card_frames, self.dashboard_card_labels):
+            frame.configure(highlightbackground=accent)
+            title_label.configure(fg=accent)
+            metric_label.configure(fg=MUTED)
+            value_label.configure(fg=TEXT)
         if self.core_canvas:
             self.core_canvas.delete("all")
             self._pulse_phase = (self._pulse_phase + 1) % 40
