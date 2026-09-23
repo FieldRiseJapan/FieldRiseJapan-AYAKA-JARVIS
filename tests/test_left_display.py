@@ -1,3 +1,4 @@
+import hashlib
 import unittest
 from pathlib import Path
 
@@ -26,6 +27,19 @@ class LeftDisplayAssetTests(unittest.TestCase):
         asset = resolve_ayaka_asset(project_root)
         self.assertEqual(asset.relative_to(project_root), AYAKA_OFFICIAL_ASSET)
         self.assertTrue(asset.is_file())
+
+    def test_official_asset_sha256_is_unchanged(self):
+        project_root = Path(__file__).parents[1]
+        asset = resolve_ayaka_asset(project_root)
+        digest = hashlib.sha256()
+        with asset.open("rb") as image_file:
+            for chunk in iter(lambda: image_file.read(1024 * 1024), b""):
+                digest.update(chunk)
+
+        self.assertEqual(
+            digest.hexdigest(),
+            "cacd63c36d37fb1f6a0c7dce3ab3ef7f6ec14601eec36d9f2b609681547eb030",
+        )
 
     def test_cover_size_fills_2560_by_1440_without_distorting_ratio(self):
         scaled = fit_cover_size((1672, 941), (2560, 1440))

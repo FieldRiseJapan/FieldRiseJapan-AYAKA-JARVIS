@@ -111,6 +111,14 @@ The LEFT monitor uses the approved AYAKA design at `assets/characters/ayaka/ayak
 
 v0.4 adds a live status HUD over the lower status area of the unchanged official image. LISTENING, THINKING, SPEAKING, and EXECUTING remain visible at low intensity while only the current state pulses in cyan. The state-transition controller, HUD model, image renderer, and Tk overlay are separate so future blinking, lip-sync, or Live2D layers can reuse the same state source. MOMOKA mode continues to show the existing fallback without the AYAKA HUD.
 
+## v0.5 character animation foundation
+
+v0.5 adds a renderer-neutral `AnimationController` and provider interface. The controller follows STANDBY, LISTENING, THINKING, EXECUTING, and SPEAKING, produces deterministic blink timing, exposes a clamped speaking-level input for future volume-driven lip sync, and keeps those signals independent from Tkinter and the voice pipeline. The current static-image provider deliberately ignores blink and mouth signals because the approved character consists of one flattened PNG.
+
+The only visual motion available with the current asset is an optional whole-character breathing offset. It is disabled by default, is limited to 0–2 vertical pixels, and can be enabled in the `animation` section of `config.json`. MOMOKA mode, missing assets, and renderer errors reset the offset to zero. The official image remains unchanged and is protected by an exact SHA-256 regression test.
+
+Visible natural blinking requires consistently aligned transparent full-character layers for open, half-closed, and closed eyes, or a rigged Live2D model. Visible lip sync requires aligned closed/open mouth shapes (ideally additional phoneme shapes) or Live2D mouth parameters. v0.5 does not crop facial regions, guess coordinates, paint over the face, or manufacture those missing assets.
+
 On Windows, install the added Pillow dependency and launch the integrated UI:
 
 ```powershell
@@ -197,6 +205,7 @@ VADテストでは、RMSによる発話開始、プリロール、無音終了�
 | `ayaka/ui/state.py` | モード、状態、テーマ、Dashboard履歴 |
 | `ayaka/ui/app.py` | 3独立Tkinterウィンドウの描画 |
 | `ayaka/ui/left_display.py` | AYAKA正式画像のLEFT表示、cover crop、Fallback |
+| `ayaka/ui/animation.py` | 状態連動アニメーションのタイミング、呼吸、まばたき、口パク基盤 |
 | `ayaka/ui/launcher.py` | v0.2 UI起動とヘッドレス配置確認 |
 | `ayaka/ui/controller.py` | IntentからUI状態への適用 |
 | `ayaka/ui/integrated.py` | Queue経由の音声Worker＋UI統合起動 |
