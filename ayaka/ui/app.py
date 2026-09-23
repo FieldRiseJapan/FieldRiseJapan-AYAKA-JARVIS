@@ -131,6 +131,7 @@ class JarvisUiApp:
         accent = self.state.theme_accent
         self.labels["left_title"].configure(text="MOMOKA // DEVELOPER MODE" if self.state.mode is JarvisMode.MOMOKA else "AYAKA", fg=accent)
         if self.left_display:
+            self.left_display.update_state(self.state.system_state)
             if self.state.mode is JarvisMode.MOMOKA:
                 self.left_display.show_fallback()
             else:

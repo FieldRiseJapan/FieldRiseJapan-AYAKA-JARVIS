@@ -7,6 +7,8 @@ from ayaka.ui.left_display import (
     fit_cover_size,
     resolve_ayaka_asset,
 )
+from ayaka.ui.left_hud import HUD_STATES, HudStatusModel, calculate_hud_bounds
+from ayaka.ui.state import JarvisState
 from ayaka.ui.monitors import MonitorInfo
 
 
@@ -36,6 +38,26 @@ class LeftDisplayAssetTests(unittest.TestCase):
     def test_monitor_work_area_is_dynamic_and_not_hardcoded(self):
         monitor = MonitorInfo("left", 0, 0, 2560, 1440, True, 0, 0, 2560, 1400)
         self.assertEqual(monitor.work_area, (0, 0, 2560, 1400))
+
+
+class LeftHudTests(unittest.TestCase):
+    def test_only_current_operational_state_is_active(self):
+        model = HudStatusModel.from_state(JarvisState.THINKING)
+
+        self.assertEqual([item.state for item in model.items], list(HUD_STATES))
+        self.assertEqual(
+            [item.state for item in model.items if item.active],
+            [JarvisState.THINKING],
+        )
+
+    def test_non_operational_state_leaves_all_hud_items_inactive(self):
+        model = HudStatusModel.from_state(JarvisState.STANDBY)
+
+        self.assertFalse(any(item.active for item in model.items))
+
+    def test_hud_bounds_stay_in_lower_status_area_at_different_sizes(self):
+        self.assertEqual(calculate_hud_bounds((2560, 1400)), (205, 1176, 2355, 1358))
+        self.assertEqual(calculate_hud_bounds((1920, 1040)), (154, 874, 1766, 1009))
 
 
 if __name__ == "__main__":

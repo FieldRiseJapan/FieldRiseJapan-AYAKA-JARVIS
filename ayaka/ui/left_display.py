@@ -4,6 +4,9 @@ import math
 from pathlib import Path
 from typing import Any
 
+from .left_hud import LeftHudOverlay
+from .state import JarvisState
+
 try:
     import tkinter as tk
 except ImportError:  # pragma: no cover - headless Linux validation
@@ -51,6 +54,7 @@ class LeftDisplay:
         self.asset_path = asset_path or resolve_ayaka_asset()
         self.image_label: Any = None
         self.fallback_frame: Any = None
+        self.hud = LeftHudOverlay(parent, monitor_size)
         self._photo: ImageTk.PhotoImage | None = None
 
     @property
@@ -62,6 +66,7 @@ class LeftDisplay:
         self.fallback_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
         if self.image_available:
             self._mount_image()
+            self.hud.mount()
         else:
             self.fallback_frame.lift()
 
@@ -84,6 +89,7 @@ class LeftDisplay:
             self.image_label.lift()
             if self.fallback_frame is not None:
                 self.fallback_frame.lower(self.image_label)
+            self.hud.show()
         elif self.fallback_frame is not None:
             self.fallback_frame.lift()
 
@@ -92,3 +98,7 @@ class LeftDisplay:
             self.fallback_frame.lift()
         if self.image_label is not None:
             self.image_label.lower(self.fallback_frame)
+        self.hud.hide()
+
+    def update_state(self, state: JarvisState) -> None:
+        self.hud.update(state)

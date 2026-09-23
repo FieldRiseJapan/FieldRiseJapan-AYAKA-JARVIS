@@ -4,6 +4,7 @@ import ctypes
 from ayaka.ui.app import monitor_geometry
 from ayaka.ui.monitors import MonitorInfo, MonitorInfoStructure, assign_monitors
 from ayaka.ui.state import DashboardPage, JarvisMode, JarvisState, UiState
+from ayaka.ui.voice_flow import VoiceUiFlow
 
 
 class MonitorAssignmentTests(unittest.TestCase):
@@ -63,6 +64,32 @@ class UiStateTests(unittest.TestCase):
         state = UiState()
         state.set_system_state(JarvisState.LISTENING)
         self.assertEqual(state.system_state, JarvisState.LISTENING)
+
+    def test_voice_flow_exposes_each_operational_state_in_order(self):
+        state = UiState()
+        flow = VoiceUiFlow(state)
+
+        observed = []
+        for transition in (
+            flow.begin_listening,
+            flow.transcript_received,
+            flow.begin_execution,
+            flow.begin_speaking,
+            flow.speech_completed,
+        ):
+            transition()
+            observed.append(state.system_state)
+
+        self.assertEqual(
+            observed,
+            [
+                JarvisState.LISTENING,
+                JarvisState.THINKING,
+                JarvisState.EXECUTING,
+                JarvisState.SPEAKING,
+                JarvisState.LISTENING,
+            ],
+        )
 
 
 if __name__ == "__main__":

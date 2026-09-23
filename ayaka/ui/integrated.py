@@ -10,7 +10,10 @@ from ..recorder import record_wav
 from ..stt import WhisperCppSTT
 from .controller import JarvisController
 from .monitors import discover_layout
-from .state import JarvisState
+from .voice_flow import VoiceUiFlow
+
+
+STATE_HOLD_MS = 550
 
 
 class VoiceWorker:
@@ -60,6 +63,30 @@ def run(config_path: Path, work_dir: Path):
             app.root.after(700, app.close)
 
     controller = JarvisController(on_close=close_ui)
+    voice_flow = VoiceUiFlow(controller.state)
+
+    def speak_and_signal(response: str):
+        try:
+            speak_windows(response)
+        finally:
+            events.put(("speech_complete", None))
+
+    def dispatch_transcript(transcript: str):
+        if not app or not app.root:
+            return
+        intent = router.route(transcript)
+        response = controller.dispatch(intent)
+        if response:
+            voice_flow.begin_speaking()
+            threading.Thread(target=speak_and_signal, args=(response,), daemon=True).start()
+        else:
+            voice_flow.speech_completed()
+
+    def begin_execution(transcript: str):
+        if not app or not app.root:
+            return
+        voice_flow.begin_execution()
+        app.root.after(STATE_HOLD_MS, lambda: dispatch_transcript(transcript))
 
     def poll_events():
         if not app or not app.root:
@@ -68,13 +95,10 @@ def run(config_path: Path, work_dir: Path):
             while True:
                 kind, payload = events.get_nowait()
                 if kind == "transcript":
-                    controller.state.set_system_state(JarvisState.THINKING)
-                    intent = router.route(payload)
-                    response = controller.dispatch(intent)
-                    if response:
-                        controller.state.set_system_state(JarvisState.SPEAKING)
-                        threading.Thread(target=speak_windows, args=(response,), daemon=True).start()
-                        app.root.after(800, lambda: controller.state.set_system_state(JarvisState.COMPLETE))
+                    voice_flow.transcript_received()
+                    app.root.after(STATE_HOLD_MS, lambda transcript=payload: begin_execution(transcript))
+                elif kind == "speech_complete":
+                    voice_flow.speech_completed()
                 elif kind == "error":
                     print(f"VOICE WORKER ERROR: {payload}", flush=True)
         except queue.Empty:
@@ -85,6 +109,7 @@ def run(config_path: Path, work_dir: Path):
         nonlocal app, worker
         app = current_app
         worker = VoiceWorker(config, work_dir, events)
+        voice_flow.begin_listening()
         worker.start()
         poll_events()
 

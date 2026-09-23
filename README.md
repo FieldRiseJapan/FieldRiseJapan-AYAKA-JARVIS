@@ -109,6 +109,8 @@ The existing `run_ayaka.bat` and `run_ayaka_ui.bat` launchers are unchanged. COE
 
 The LEFT monitor uses the approved AYAKA design at `assets/characters/ayaka/ayaka_left_official.png`. `ayaka/ui/left_display.py` owns this surface so the image renderer can later be replaced by Live2D or another animated character layer without changing CENTER, RIGHT, or the audio pipeline. On Windows, LEFT uses the Win32 `MONITORINFO.rcWork` work area rather than the full monitor rectangle, so a visible taskbar is excluded dynamically. The image is fit within that work area while preserving its aspect ratio; minimal letterboxing is preferred to cropping the HUD. If the asset or Pillow renderer is unavailable, the previous AYAKA placeholder is shown instead. AYAKA mode displays the official image, while MOMOKA mode keeps the existing developer fallback.
 
+v0.4 adds a live status HUD over the lower status area of the unchanged official image. LISTENING, THINKING, SPEAKING, and EXECUTING remain visible at low intensity while only the current state pulses in cyan. The state-transition controller, HUD model, image renderer, and Tk overlay are separate so future blinking, lip-sync, or Live2D layers can reuse the same state source. MOMOKA mode continues to show the existing fallback without the AYAKA HUD.
+
 On Windows, install the added Pillow dependency and launch the integrated UI:
 
 ```powershell
