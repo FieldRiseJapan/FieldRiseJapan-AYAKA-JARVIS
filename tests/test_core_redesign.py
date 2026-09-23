@@ -5,6 +5,16 @@ from ayaka.ui.dashboard import CENTER_CORE_SIZE, CENTER_CARDS, CARD_GRID_COLUMNS
 
 
 class ProductionAliasTests(unittest.TestCase):
+    def test_new_field_aliases_route_to_the_expected_modes(self):
+        router = CommandRouter()
+        for alias in ("おもが", "もうまか", "何もか"):
+            with self.subTest(alias=alias):
+                self.assertEqual(router.route(alias), Intent.MOMOKA_MODE)
+        self.assertEqual(router.route("あやかー"), Intent.AYAKA_MODE)
+
+    def test_existing_momoka_alias_is_not_duplicated(self):
+        self.assertEqual(MOMOKA_NAME_ALIASES.count("おもが"), 1)
+
     def test_all_momoka_aliases_route_to_momoka_mode(self):
         router = CommandRouter()
         for alias in MOMOKA_NAME_ALIASES:
