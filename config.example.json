@@ -1,0 +1,19 @@
+{
+  "audio": {
+    "device_name": "Jabra Speak2 40 MS",
+    "hostapi_name": "Windows WASAPI",
+    "device_index": null,
+    "sample_rate": 16000,
+    "channels": 1,
+    "chunk_seconds": 5
+  },
+  "whisper": {
+    "executable": "vendor/whisper.cpp/build/bin/Release/whisper-cli.exe",
+    "model": "models/ggml-small.bin",
+    "language": "ja",
+    "chunk_seconds": 5,
+    "temperature": 0.0
+  },
+  "wake_words": ["彩花"],
+  "reply_text": "はい、社長。"
+}
