@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from .dashboard import CARD_GRID_COLUMNS, CARD_GRID_ROWS, CENTER_CARDS, CENTER_CORE_SIZE
+from .left_display import LeftDisplay
 from .monitors import MonitorLayout, discover_layout
 from .state import DashboardPage, JarvisMode, UiState
 
@@ -26,6 +27,7 @@ class JarvisUiApp:
         self.labels: dict[str, tk.Label] = {}
         self.dashboard_card_frames: list[tk.Frame] = []
         self.dashboard_card_labels: list[tuple[tk.Label, tk.Label, tk.Label]] = []
+        self.left_display: LeftDisplay | None = None
         self.core_canvas: tk.Canvas | None = None
         self._pulse_phase = 0
         self.on_ready = on_ready
@@ -52,13 +54,19 @@ class JarvisUiApp:
         return label
 
     def _build_left(self, window):
-        self._label(window, "FIELD RISE", size=14, color=MUTED, bold=True)
-        self.labels["left_title"] = self._label(window, "AYAKA", size=38, color="#68e8ff", bold=True)
-        self._label(window, "SYSTEM CORE / VOICE INTERFACE", size=12, color=MUTED)
-        character = tk.Frame(window, bg=PANEL, highlightbackground="#1c6682", highlightthickness=1)
+        self.left_display = LeftDisplay(window, (self.layout.left.width, self.layout.left.height))
+        self.left_display.mount(self._build_left_fallback)
+
+    def _build_left_fallback(self, window):
+        fallback = tk.Frame(window, bg=BACKGROUND)
+        self._label(fallback, "FIELD RISE", size=14, color=MUTED, bold=True)
+        self.labels["left_title"] = self._label(fallback, "AYAKA", size=38, color="#68e8ff", bold=True)
+        self._label(fallback, "SYSTEM CORE / VOICE INTERFACE", size=12, color=MUTED)
+        character = tk.Frame(fallback, bg=PANEL, highlightbackground="#1c6682", highlightthickness=1)
         character.pack(fill="both", expand=True, padx=32, pady=28)
         tk.Label(character, text="◈", fg="#68e8ff", bg=PANEL, font=("Consolas", 96, "normal")).pack(expand=True)
         tk.Label(character, text="AYAKA // ACTIVE CHARACTER", fg="#68e8ff", bg=PANEL, font=("Consolas", 16, "bold")).pack(pady=(0, 36))
+        return fallback
 
     def _build_center(self, window):
         self._label(window, "FIELD RISE // AYAKA JARVIS", size=18, color="#68e8ff", bold=True)
@@ -118,6 +126,11 @@ class JarvisUiApp:
         self.labels["page"].configure(text=f"CENTER / {self.state.page.value}")
         accent = self.state.theme_accent
         self.labels["left_title"].configure(text="MOMOKA // DEVELOPER MODE" if self.state.mode is JarvisMode.MOMOKA else "AYAKA", fg=accent)
+        if self.left_display:
+            if self.state.mode is JarvisMode.MOMOKA:
+                self.left_display.show_fallback()
+            else:
+                self.left_display.show_ayaka()
         self.labels["core"].configure(text=f"{self.state.theme_name} CORE", fg=accent)
         self.labels["status"].configure(fg=accent)
         for frame, (title_label, metric_label, value_label) in zip(self.dashboard_card_frames, self.dashboard_card_labels):

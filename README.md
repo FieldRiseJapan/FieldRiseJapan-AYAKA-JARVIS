@@ -105,6 +105,17 @@ The CENTER HOME dashboard is CORE-first: a large animated blue/cyan or purple/vi
 
 The existing `run_ayaka.bat` and `run_ayaka_ui.bat` launchers are unchanged. COEIROINK, idle timers, real dashboard data, character assets, and background wake-listener persistence remain later phases.
 
+## Official AYAKA LEFT display
+
+The LEFT monitor uses the approved AYAKA design at `assets/characters/ayaka/ayaka_left_official.png`. `ayaka/ui/left_display.py` owns this surface so the image renderer can later be replaced by Live2D or another animated character layer without changing CENTER, RIGHT, or the audio pipeline. The image is cover-cropped to the LEFT monitor dimensions while preserving its aspect ratio; if the asset or Pillow renderer is unavailable, the previous AYAKA placeholder is shown instead. AYAKA mode displays the official image, while MOMOKA mode keeps the existing developer fallback.
+
+On Windows, install the added Pillow dependency and launch the integrated UI:
+
+```powershell
+py -3 -m pip install -r requirements.txt
+run_ayaka_jarvis.bat
+```
+
 ## VAD設定
 
 `config.json` の `vad` で調整できます。音量値は16-bit PCMのRMSスケールです。
@@ -183,6 +194,7 @@ VADテストでは、RMSによる発話開始、プリロール、無音終了�
 | `ayaka/ui/monitors.py` | Windowsモニター検出とLEFT/CENTER/RIGHT割当 |
 | `ayaka/ui/state.py` | モード、状態、テーマ、Dashboard履歴 |
 | `ayaka/ui/app.py` | 3独立Tkinterウィンドウの描画 |
+| `ayaka/ui/left_display.py` | AYAKA正式画像のLEFT表示、cover crop、Fallback |
 | `ayaka/ui/launcher.py` | v0.2 UI起動とヘッドレス配置確認 |
 | `ayaka/ui/controller.py` | IntentからUI状態への適用 |
 | `ayaka/ui/integrated.py` | Queue経由の音声Worker＋UI統合起動 |
