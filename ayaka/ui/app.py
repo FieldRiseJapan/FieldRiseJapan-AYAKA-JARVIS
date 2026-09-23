@@ -1,4 +1,6 @@
+import ctypes
 from datetime import datetime
+import sys
 import tkinter as tk
 from tkinter import ttk
 
@@ -21,6 +23,23 @@ def monitor_geometry(monitor) -> str:
     return f"{work_width}x{work_height}{x}{y}"
 
 
+def _position_window_win32(window, x: int, y: int, *, user32=None) -> None:
+    user32 = user32 or ctypes.windll.user32
+    flags = 0x0001 | 0x0004 | 0x0010  # NOSIZE | NOZORDER | NOACTIVATE
+    toplevel_handle = user32.GetParent(window.winfo_id())
+    user32.SetWindowPos(toplevel_handle, 0, x, y, 0, 0, flags)
+
+
+def position_window(window, monitor, *, platform: str | None = None, native_position=None) -> None:
+    work_x, work_y, work_width, work_height = monitor.work_area
+    if (platform or sys.platform) == "win32":
+        window.geometry(f"{work_width}x{work_height}")
+        window.update_idletasks()
+        (native_position or _position_window_win32)(window, work_x, work_y)
+        return
+    window.geometry(monitor_geometry(monitor))
+
+
 class JarvisUiApp:
     def __init__(self, layout: MonitorLayout | None = None, state: UiState | None = None, on_ready=None):
         self.layout = layout or discover_layout()
@@ -38,7 +57,7 @@ class JarvisUiApp:
     def _make_window(self, parent, title: str, monitor):
         window = parent if title == "AYAKA JARVIS LEFT" else tk.Toplevel(parent)
         window.title(title)
-        window.geometry(monitor_geometry(monitor))
+        position_window(window, monitor)
         window.configure(bg=BACKGROUND)
         window.minsize(500, 400)
         window.protocol("WM_DELETE_WINDOW", self.close)

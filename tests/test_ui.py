@@ -1,6 +1,7 @@
 import unittest
 import ctypes
 
+from ayaka.ui import app as ui_app
 from ayaka.ui.app import monitor_geometry
 from ayaka.ui.monitors import MonitorInfo, MonitorInfoStructure, assign_monitors
 from ayaka.ui.state import DashboardPage, JarvisMode, JarvisState, UiState
@@ -39,6 +40,60 @@ class MonitorAssignmentTests(unittest.TestCase):
 
         self.assertEqual(monitor.work_area, (-1080, 40, 1080, 1840))
         self.assertEqual(monitor_geometry(monitor), "1080x1840-1080+40")
+
+    def test_negative_y_monitor_is_positioned_with_absolute_windows_coordinates(self):
+        class FakeWindow:
+            def __init__(self):
+                self.geometry_value = None
+                self.bounds = None
+
+            def geometry(self, value):
+                self.geometry_value = value
+
+            def update_idletasks(self):
+                pass
+
+        def native_position(window, x, y):
+            window.bounds = (x, y)
+
+        monitor = MonitorInfo(
+            "center", 2560, -472, 1080, 1920, False,
+            work_x=2560, work_y=-472, work_width=1080, work_height=1872,
+        )
+        window = FakeWindow()
+
+        ui_app.position_window(
+            window,
+            monitor,
+            platform="win32",
+            native_position=native_position,
+        )
+
+        self.assertEqual(window.geometry_value, "1080x1872")
+        self.assertEqual(window.bounds, (2560, -472))
+
+    def test_windows_positioning_moves_tk_toplevel_wrapper(self):
+        class FakeWindow:
+            def winfo_id(self):
+                return 101
+
+        class FakeUser32:
+            def __init__(self):
+                self.positions = {}
+
+            def GetParent(self, handle):
+                self.requested_child = handle
+                return 202
+
+            def SetWindowPos(self, handle, _after, x, y, _cx, _cy, _flags):
+                self.positions[handle] = (x, y)
+
+        user32 = FakeUser32()
+
+        ui_app._position_window_win32(FakeWindow(), 2560, -472, user32=user32)
+
+        self.assertEqual(user32.requested_child, 101)
+        self.assertEqual(user32.positions, {202: (2560, -472)})
 
 
 class UiStateTests(unittest.TestCase):
