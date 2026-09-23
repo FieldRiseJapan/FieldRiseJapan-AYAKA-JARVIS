@@ -22,6 +22,12 @@
     "chunk_seconds": 5,
     "temperature": 0.0
   },
+  "animation": {
+    "breathing_enabled": false,
+    "breathing_amplitude_px": 1,
+    "breathing_period_seconds": 4.0,
+    "frame_interval_ms": 100
+  },
   "wake_words": ["彩花", "おはよう"],
   "reply_text": "おはようございます、社長。"
 }

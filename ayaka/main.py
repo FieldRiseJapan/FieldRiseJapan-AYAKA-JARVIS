@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import subprocess
 
-from .config import AppConfig, AudioConfig, VadConfig, WhisperConfig
+from .config import AnimationConfig, AppConfig, AudioConfig, VadConfig, WhisperConfig
 from .recorder import record_wav
 from .stt import WhisperCppSTT
 from .wake import WakeWordDetector
@@ -21,10 +21,12 @@ def load_config(path: Path | None) -> AppConfig:
     if "model" in whisper_data:
         whisper_data["model"] = Path(whisper_data["model"])
     whisper = WhisperConfig(**whisper_data)
+    animation = AnimationConfig(**raw.get("animation", {}))
     return AppConfig(
         audio=audio,
         vad=vad,
         whisper=whisper,
+        animation=animation,
         wake_words=tuple(raw.get("wake_words", ["彩花"])),
         reply_text=raw.get("reply_text", "はい、社長。"),
     )

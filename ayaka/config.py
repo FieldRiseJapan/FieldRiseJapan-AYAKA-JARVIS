@@ -32,9 +32,22 @@ class WhisperConfig:
 
 
 @dataclass(frozen=True)
+class AnimationConfig:
+    breathing_enabled: bool = False
+    breathing_amplitude_px: int = 1
+    breathing_period_seconds: float = 4.0
+    frame_interval_ms: int = 100
+
+    @property
+    def safe_breathing_amplitude_px(self) -> int:
+        return min(2, max(0, self.breathing_amplitude_px))
+
+
+@dataclass(frozen=True)
 class AppConfig:
     audio: AudioConfig = AudioConfig()
     vad: VadConfig = VadConfig()
     whisper: WhisperConfig = WhisperConfig()
+    animation: AnimationConfig = AnimationConfig()
     wake_words: tuple[str, ...] = ("彩花",)
     reply_text: str = "はい、社長。"

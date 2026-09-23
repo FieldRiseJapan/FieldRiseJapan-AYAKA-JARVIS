@@ -1,0 +1,98 @@
+"""Renderer-neutral character animation state and timing."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from dataclasses import dataclass
+from enum import Enum
+import math
+import random
+import time
+from typing import Protocol
+
+from ..config import AnimationConfig
+from .state import JarvisState
+
+
+class BlinkPhase(str, Enum):
+    OPEN = "OPEN"
+    HALF = "HALF"
+    CLOSED = "CLOSED"
+
+
+@dataclass(frozen=True)
+class AnimationFrame:
+    state: JarvisState
+    vertical_offset_px: int = 0
+    blink_phase: BlinkPhase = BlinkPhase.OPEN
+    mouth_open: float = 0.0
+    speaking: bool = False
+
+
+class CharacterAnimationProvider(Protocol):
+    def apply(self, frame: AnimationFrame) -> None: ...
+
+    def reset(self) -> None: ...
+
+
+class AnimationController:
+    """Produce animation signals without knowing how a character is rendered."""
+
+    HALF_CLOSE_SECONDS = 0.08
+    CLOSED_SECONDS = 0.12
+    HALF_OPEN_SECONDS = 0.08
+
+    def __init__(
+        self,
+        config: AnimationConfig | None = None,
+        *,
+        clock: Callable[[], float] = time.monotonic,
+        blink_interval: Callable[[], float] | None = None,
+    ):
+        self.config = config or AnimationConfig()
+        self._clock = clock
+        self._blink_interval = blink_interval or (lambda: random.uniform(3.5, 6.5))
+        self._started_at = self._clock()
+        self._next_blink_at = self._started_at + max(0.1, self._blink_interval())
+        self._state = JarvisState.STANDBY
+        self._speaking_level = 0.0
+
+    def set_speaking_level(self, level: float) -> None:
+        self._speaking_level = min(1.0, max(0.0, float(level)))
+
+    def update(self, state: JarvisState, *, now: float | None = None) -> AnimationFrame:
+        current_time = self._clock() if now is None else now
+        if self._state is JarvisState.SPEAKING and state is not JarvisState.SPEAKING:
+            self._speaking_level = 0.0
+        self._state = state
+        speaking = state is JarvisState.SPEAKING
+        return AnimationFrame(
+            state=state,
+            vertical_offset_px=self._breathing_offset(current_time),
+            blink_phase=self._blink_phase(current_time),
+            mouth_open=self._speaking_level if speaking else 0.0,
+            speaking=speaking,
+        )
+
+    def _breathing_offset(self, now: float) -> int:
+        amplitude = self.config.safe_breathing_amplitude_px
+        period = self.config.breathing_period_seconds
+        if not self.config.breathing_enabled or amplitude == 0 or period <= 0:
+            return 0
+        phase = ((now - self._started_at) / period) * math.tau
+        return round(amplitude * math.sin(phase))
+
+    def _blink_phase(self, now: float) -> BlinkPhase:
+        half_closed_at = self._next_blink_at + self.HALF_CLOSE_SECONDS
+        closed_until = half_closed_at + self.CLOSED_SECONDS
+        reopened_at = closed_until + self.HALF_OPEN_SECONDS
+        if now < self._next_blink_at:
+            return BlinkPhase.OPEN
+        if now < half_closed_at:
+            return BlinkPhase.HALF
+        if now < closed_until:
+            return BlinkPhase.CLOSED
+        if now < reopened_at:
+            return BlinkPhase.HALF
+        self._next_blink_at = now + max(0.1, self._blink_interval())
+        return BlinkPhase.OPEN
