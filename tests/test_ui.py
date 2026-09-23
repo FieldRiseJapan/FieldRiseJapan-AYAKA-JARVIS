@@ -1,6 +1,7 @@
 import unittest
 import ctypes
 
+from ayaka.ui.app import monitor_geometry
 from ayaka.ui.monitors import MonitorInfo, MonitorInfoStructure, assign_monitors
 from ayaka.ui.state import DashboardPage, JarvisMode, JarvisState, UiState
 
@@ -28,6 +29,15 @@ class MonitorAssignmentTests(unittest.TestCase):
         self.assertEqual(layout.left.name, "only")
         self.assertEqual(layout.center.name, "only")
         self.assertEqual(layout.right.name, "only")
+
+    def test_win32_work_area_drives_window_geometry(self):
+        monitor = MonitorInfo(
+            "center", -1080, 0, 1080, 1920, False,
+            work_x=-1080, work_y=40, work_width=1080, work_height=1840,
+        )
+
+        self.assertEqual(monitor.work_area, (-1080, 40, 1080, 1840))
+        self.assertEqual(monitor_geometry(monitor), "1080x1840-1080+40")
 
 
 class UiStateTests(unittest.TestCase):

@@ -15,7 +15,10 @@ MUTED = "#7191a8"
 
 
 def monitor_geometry(monitor) -> str:
-    return f"{monitor.width}x{monitor.height}+{monitor.x}+{monitor.y}"
+    work_x, work_y, work_width, work_height = monitor.work_area
+    x = f"+{work_x}" if work_x >= 0 else str(work_x)
+    y = f"+{work_y}" if work_y >= 0 else str(work_y)
+    return f"{work_width}x{work_height}{x}{y}"
 
 
 class JarvisUiApp:
@@ -32,14 +35,10 @@ class JarvisUiApp:
         self._pulse_phase = 0
         self.on_ready = on_ready
 
-    def _make_window(self, parent, title: str, monitor, *, use_work_area: bool = False):
+    def _make_window(self, parent, title: str, monitor):
         window = parent if title == "AYAKA JARVIS LEFT" else tk.Toplevel(parent)
         window.title(title)
-        geometry = monitor_geometry(monitor)
-        if use_work_area:
-            x, y, width, height = monitor.work_area
-            geometry = f"{width}x{height}+{x}+{y}"
-        window.geometry(geometry)
+        window.geometry(monitor_geometry(monitor))
         window.configure(bg=BACKGROUND)
         window.minsize(500, 400)
         window.protocol("WM_DELETE_WINDOW", self.close)
@@ -159,7 +158,7 @@ class JarvisUiApp:
 
     def run(self):
         self.root = tk.Tk()
-        self.windows["left"] = self._make_window(self.root, "AYAKA JARVIS LEFT", self.layout.left, use_work_area=True)
+        self.windows["left"] = self._make_window(self.root, "AYAKA JARVIS LEFT", self.layout.left)
         self.windows["center"] = self._make_window(self.root, "AYAKA JARVIS CENTER", self.layout.center)
         self.windows["right"] = self._make_window(self.root, "AYAKA JARVIS RIGHT", self.layout.right)
         self._build_left(self.windows["left"])
