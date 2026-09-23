@@ -3,6 +3,8 @@ from pathlib import Path
 
 from ayaka.ui.left_display import (
     AYAKA_OFFICIAL_ASSET,
+    LeftDisplay,
+    StaticImageAnimationProvider,
     fit_contain_size,
     fit_cover_size,
     resolve_ayaka_asset,
@@ -13,6 +15,7 @@ from ayaka.ui.left_hud import (
     LeftHudOverlay,
     calculate_hud_bounds,
 )
+from ayaka.ui.animation import AnimationFrame, BlinkPhase
 from ayaka.ui.state import JarvisState
 from ayaka.ui.monitors import MonitorInfo
 
@@ -43,6 +46,75 @@ class LeftDisplayAssetTests(unittest.TestCase):
     def test_monitor_work_area_is_dynamic_and_not_hardcoded(self):
         monitor = MonitorInfo("left", 0, 0, 2560, 1440, True, 0, 0, 2560, 1400)
         self.assertEqual(monitor.work_area, (0, 0, 2560, 1400))
+
+
+class StaticImageAnimationProviderTests(unittest.TestCase):
+    def test_provider_applies_only_whole_character_vertical_offset(self):
+        class FakeLabel:
+            def __init__(self):
+                self.placements = []
+
+            def place_configure(self, **kwargs):
+                self.placements.append(kwargs)
+
+        label = FakeLabel()
+        provider = StaticImageAnimationProvider(label)
+        frame = AnimationFrame(
+            state=JarvisState.SPEAKING,
+            vertical_offset_px=2,
+            blink_phase=BlinkPhase.CLOSED,
+            mouth_open=1.0,
+            speaking=True,
+        )
+
+        provider.apply(frame)
+        provider.reset()
+
+        self.assertEqual(label.placements, [{"y": 2}, {"y": 0}])
+
+    def test_animation_provider_failure_is_contained_and_reset(self):
+        class RaisingProvider:
+            def __init__(self):
+                self.reset_count = 0
+
+            def apply(self, _frame):
+                raise RuntimeError("renderer unavailable")
+
+            def reset(self):
+                self.reset_count += 1
+
+        provider = RaisingProvider()
+        display = LeftDisplay(
+            parent=None,
+            monitor_size=(1920, 1040),
+            animation_provider=provider,
+        )
+
+        display.animate(JarvisState.LISTENING)
+
+        self.assertEqual(provider.reset_count, 1)
+
+    def test_fallback_resets_character_offset(self):
+        class RecordingProvider:
+            def __init__(self):
+                self.reset_count = 0
+
+            def apply(self, _frame):
+                pass
+
+            def reset(self):
+                self.reset_count += 1
+
+        provider = RecordingProvider()
+        display = LeftDisplay(
+            parent=None,
+            monitor_size=(1920, 1040),
+            animation_provider=provider,
+        )
+
+        display.show_fallback()
+
+        self.assertEqual(provider.reset_count, 1)
 
 
 class LeftHudTests(unittest.TestCase):

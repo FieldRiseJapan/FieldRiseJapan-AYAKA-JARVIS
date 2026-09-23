@@ -4,6 +4,8 @@ import math
 from pathlib import Path
 from typing import Any
 
+from ..config import AnimationConfig
+from .animation import AnimationController, AnimationFrame, CharacterAnimationProvider
 from .left_hud import LeftHudOverlay
 from .state import JarvisState
 
@@ -45,10 +47,30 @@ def fit_contain_size(source_size: tuple[int, int], target_size: tuple[int, int])
     return max(1, math.floor(source_width * scale)), max(1, math.floor(source_height * scale))
 
 
+class StaticImageAnimationProvider:
+    """Apply safe whole-character motion without altering image pixels."""
+
+    def __init__(self, image_label: Any):
+        self.image_label = image_label
+
+    def apply(self, frame: AnimationFrame) -> None:
+        self.image_label.place_configure(y=frame.vertical_offset_px)
+
+    def reset(self) -> None:
+        self.image_label.place_configure(y=0)
+
+
 class LeftDisplay:
     """AYAKA LEFT surface, isolated for a future Live2D/animated replacement."""
 
-    def __init__(self, parent, monitor_size: tuple[int, int], asset_path: Path | None = None):
+    def __init__(
+        self,
+        parent,
+        monitor_size: tuple[int, int],
+        asset_path: Path | None = None,
+        animation_config: AnimationConfig | None = None,
+        animation_provider: CharacterAnimationProvider | None = None,
+    ):
         self.parent = parent
         self.monitor_size = monitor_size
         self.asset_path = asset_path or resolve_ayaka_asset()
@@ -56,6 +78,8 @@ class LeftDisplay:
         self.fallback_frame: Any = None
         self.hud = LeftHudOverlay(parent, monitor_size)
         self._photo: ImageTk.PhotoImage | None = None
+        self.animation_controller = AnimationController(animation_config)
+        self.animation_provider = animation_provider
 
     @property
     def image_available(self) -> bool:
@@ -83,6 +107,8 @@ class LeftDisplay:
         self.image_label = tk.Label(self.parent, image=self._photo, borderwidth=0, highlightthickness=0)
         self.image_label.place(relx=0, rely=0, relwidth=1, relheight=1)
         self.image_label.lower(self.fallback_frame)
+        if self.animation_provider is None:
+            self.animation_provider = StaticImageAnimationProvider(self.image_label)
 
     def show_ayaka(self) -> None:
         if self.image_label is not None and self.image_available:
@@ -94,6 +120,7 @@ class LeftDisplay:
             self.fallback_frame.lift()
 
     def show_fallback(self) -> None:
+        self.reset_animation()
         if self.fallback_frame is not None:
             self.fallback_frame.lift()
         if self.image_label is not None:
@@ -102,3 +129,19 @@ class LeftDisplay:
 
     def update_state(self, state: JarvisState) -> None:
         self.hud.update(state)
+
+    def animate(self, state: JarvisState) -> None:
+        if self.animation_provider is None:
+            return
+        try:
+            self.animation_provider.apply(self.animation_controller.update(state))
+        except Exception:
+            self.reset_animation()
+
+    def reset_animation(self) -> None:
+        if self.animation_provider is None:
+            return
+        try:
+            self.animation_provider.reset()
+        except Exception:
+            pass

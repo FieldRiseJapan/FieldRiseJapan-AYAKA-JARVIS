@@ -113,7 +113,12 @@ def run(config_path: Path, work_dir: Path):
         worker.start()
         poll_events()
 
-    app = JarvisUiApp(layout=discover_layout(), state=controller.state, on_ready=on_ready)
+    app = JarvisUiApp(
+        layout=discover_layout(),
+        state=controller.state,
+        on_ready=on_ready,
+        animation_config=config.animation,
+    )
     try:
         app.run()
     finally:

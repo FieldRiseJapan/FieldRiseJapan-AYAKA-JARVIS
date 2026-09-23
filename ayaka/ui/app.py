@@ -4,6 +4,7 @@ import sys
 import tkinter as tk
 from tkinter import ttk
 
+from ..config import AnimationConfig
 from .dashboard import CARD_GRID_COLUMNS, CARD_GRID_ROWS, CENTER_CARDS, CENTER_CORE_SIZE
 from .left_display import LeftDisplay
 from .monitors import MonitorLayout, discover_layout
@@ -14,6 +15,7 @@ BACKGROUND = "#050b18"
 PANEL = "#0a1428"
 TEXT = "#d9f5ff"
 MUTED = "#7191a8"
+UI_REFRESH_MS = 500
 
 
 def monitor_geometry(monitor) -> str:
@@ -41,9 +43,16 @@ def position_window(window, monitor, *, platform: str | None = None, native_posi
 
 
 class JarvisUiApp:
-    def __init__(self, layout: MonitorLayout | None = None, state: UiState | None = None, on_ready=None):
+    def __init__(
+        self,
+        layout: MonitorLayout | None = None,
+        state: UiState | None = None,
+        on_ready=None,
+        animation_config: AnimationConfig | None = None,
+    ):
         self.layout = layout or discover_layout()
         self.state = state or UiState()
+        self.animation_config = animation_config or AnimationConfig()
         self.root: tk.Tk | None = None
         self.windows: dict[str, tk.Misc] = {}
         self.labels: dict[str, tk.Label] = {}
@@ -77,7 +86,11 @@ class JarvisUiApp:
 
     def _build_left(self, window):
         _x, _y, work_width, work_height = self.layout.left.work_area
-        self.left_display = LeftDisplay(window, (work_width, work_height))
+        self.left_display = LeftDisplay(
+            window,
+            (work_width, work_height),
+            animation_config=self.animation_config,
+        )
         self.left_display.mount(self._build_left_fallback)
 
     def _build_left_fallback(self, window):
@@ -174,7 +187,18 @@ class JarvisUiApp:
                 self.core_canvas.create_oval(center_x - ring_radius, center_y - ring_radius, center_x + ring_radius, center_y + ring_radius, outline=accent, width=ring_width)
             core_radius = max(56, radius // 2)
             self.core_canvas.create_oval(center_x - core_radius, center_y - core_radius, center_x + core_radius, center_y + core_radius, fill=accent, outline=accent)
-        self.root.after(500, self.refresh)
+        self.root.after(UI_REFRESH_MS, self.refresh)
+
+    def _refresh_animation(self):
+        if not self.root:
+            return
+        if self.left_display:
+            if self.state.mode is JarvisMode.AYAKA:
+                self.left_display.animate(self.state.system_state)
+            else:
+                self.left_display.reset_animation()
+        interval_ms = max(16, self.animation_config.frame_interval_ms)
+        self.root.after(interval_ms, self._refresh_animation)
 
     def run(self):
         self.root = tk.Tk()
@@ -187,6 +211,7 @@ class JarvisUiApp:
         if self.on_ready:
             self.on_ready(self)
         self.refresh()
+        self._refresh_animation()
         self.root.mainloop()
 
     def close(self):

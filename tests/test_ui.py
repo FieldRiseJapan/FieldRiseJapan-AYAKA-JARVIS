@@ -2,7 +2,8 @@ import unittest
 import ctypes
 
 from ayaka.ui import app as ui_app
-from ayaka.ui.app import monitor_geometry
+from ayaka.config import AnimationConfig
+from ayaka.ui.app import JarvisUiApp, UI_REFRESH_MS, monitor_geometry
 from ayaka.ui.monitors import MonitorInfo, MonitorInfoStructure, assign_monitors
 from ayaka.ui.state import DashboardPage, JarvisMode, JarvisState, UiState
 from ayaka.ui.voice_flow import VoiceUiFlow
@@ -145,6 +146,55 @@ class UiStateTests(unittest.TestCase):
                 JarvisState.LISTENING,
             ],
         )
+
+
+class UiAnimationLoopTests(unittest.TestCase):
+    class FakeRoot:
+        def __init__(self):
+            self.scheduled = []
+
+        def after(self, milliseconds, callback):
+            self.scheduled.append((milliseconds, callback))
+
+    class FakeLeftDisplay:
+        def __init__(self):
+            self.animated_states = []
+            self.reset_count = 0
+
+        def animate(self, state):
+            self.animated_states.append(state)
+
+        def reset_animation(self):
+            self.reset_count += 1
+
+    def test_existing_ui_refresh_interval_remains_500_ms(self):
+        self.assertEqual(UI_REFRESH_MS, 500)
+
+    def test_ayaka_animation_loop_uses_independent_configured_interval(self):
+        state = UiState(system_state=JarvisState.THINKING)
+        app = JarvisUiApp(
+            state=state,
+            animation_config=AnimationConfig(frame_interval_ms=125),
+        )
+        app.root = self.FakeRoot()
+        app.left_display = self.FakeLeftDisplay()
+
+        app._refresh_animation()
+
+        self.assertEqual(app.left_display.animated_states, [JarvisState.THINKING])
+        self.assertEqual(len(app.root.scheduled), 1)
+        self.assertEqual(app.root.scheduled[0][0], 125)
+
+    def test_momoka_animation_loop_resets_ayaka_motion(self):
+        state = UiState(mode=JarvisMode.MOMOKA)
+        app = JarvisUiApp(state=state, animation_config=AnimationConfig())
+        app.root = self.FakeRoot()
+        app.left_display = self.FakeLeftDisplay()
+
+        app._refresh_animation()
+
+        self.assertEqual(app.left_display.animated_states, [])
+        self.assertEqual(app.left_display.reset_count, 1)
 
 
 if __name__ == "__main__":
