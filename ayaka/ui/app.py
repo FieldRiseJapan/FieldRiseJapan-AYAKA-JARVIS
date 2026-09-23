@@ -32,10 +32,14 @@ class JarvisUiApp:
         self._pulse_phase = 0
         self.on_ready = on_ready
 
-    def _make_window(self, parent, title: str, monitor):
+    def _make_window(self, parent, title: str, monitor, *, use_work_area: bool = False):
         window = parent if title == "AYAKA JARVIS LEFT" else tk.Toplevel(parent)
         window.title(title)
-        window.geometry(monitor_geometry(monitor))
+        geometry = monitor_geometry(monitor)
+        if use_work_area:
+            x, y, width, height = monitor.work_area
+            geometry = f"{width}x{height}+{x}+{y}"
+        window.geometry(geometry)
         window.configure(bg=BACKGROUND)
         window.minsize(500, 400)
         window.protocol("WM_DELETE_WINDOW", self.close)
@@ -54,7 +58,8 @@ class JarvisUiApp:
         return label
 
     def _build_left(self, window):
-        self.left_display = LeftDisplay(window, (self.layout.left.width, self.layout.left.height))
+        _x, _y, work_width, work_height = self.layout.left.work_area
+        self.left_display = LeftDisplay(window, (work_width, work_height))
         self.left_display.mount(self._build_left_fallback)
 
     def _build_left_fallback(self, window):
@@ -154,7 +159,7 @@ class JarvisUiApp:
 
     def run(self):
         self.root = tk.Tk()
-        self.windows["left"] = self._make_window(self.root, "AYAKA JARVIS LEFT", self.layout.left)
+        self.windows["left"] = self._make_window(self.root, "AYAKA JARVIS LEFT", self.layout.left, use_work_area=True)
         self.windows["center"] = self._make_window(self.root, "AYAKA JARVIS CENTER", self.layout.center)
         self.windows["right"] = self._make_window(self.root, "AYAKA JARVIS RIGHT", self.layout.right)
         self._build_left(self.windows["left"])

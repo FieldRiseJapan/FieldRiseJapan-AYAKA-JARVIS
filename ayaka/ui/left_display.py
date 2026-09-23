@@ -33,6 +33,15 @@ def fit_cover_size(source_size: tuple[int, int], target_size: tuple[int, int]) -
     return math.ceil(source_width * scale), math.ceil(source_height * scale)
 
 
+def fit_contain_size(source_size: tuple[int, int], target_size: tuple[int, int]) -> tuple[int, int]:
+    source_width, source_height = source_size
+    target_width, target_height = target_size
+    if min(source_width, source_height, target_width, target_height) <= 0:
+        raise ValueError("image and target dimensions must be positive")
+    scale = min(target_width / source_width, target_height / source_height)
+    return max(1, math.floor(source_width * scale)), max(1, math.floor(source_height * scale))
+
+
 class LeftDisplay:
     """AYAKA LEFT surface, isolated for a future Live2D/animated replacement."""
 
@@ -58,11 +67,13 @@ class LeftDisplay:
 
     def _mount_image(self) -> None:
         image = Image.open(self.asset_path).convert("RGB")
-        resized_size = fit_cover_size(image.size, self.monitor_size)
+        resized_size = fit_contain_size(image.size, self.monitor_size)
         image = image.resize(resized_size, Image.Resampling.LANCZOS)
-        left = (resized_size[0] - self.monitor_size[0]) // 2
-        top = (resized_size[1] - self.monitor_size[1]) // 2
-        image = image.crop((left, top, left + self.monitor_size[0], top + self.monitor_size[1]))
+        canvas = Image.new("RGB", self.monitor_size, (0, 0, 0))
+        left = (self.monitor_size[0] - resized_size[0]) // 2
+        top = (self.monitor_size[1] - resized_size[1]) // 2
+        canvas.paste(image, (left, top))
+        image = canvas
         self._photo = ImageTk.PhotoImage(image)
         self.image_label = tk.Label(self.parent, image=self._photo, borderwidth=0, highlightthickness=0)
         self.image_label.place(relx=0, rely=0, relwidth=1, relheight=1)

@@ -107,7 +107,7 @@ The existing `run_ayaka.bat` and `run_ayaka_ui.bat` launchers are unchanged. COE
 
 ## Official AYAKA LEFT display
 
-The LEFT monitor uses the approved AYAKA design at `assets/characters/ayaka/ayaka_left_official.png`. `ayaka/ui/left_display.py` owns this surface so the image renderer can later be replaced by Live2D or another animated character layer without changing CENTER, RIGHT, or the audio pipeline. The image is cover-cropped to the LEFT monitor dimensions while preserving its aspect ratio; if the asset or Pillow renderer is unavailable, the previous AYAKA placeholder is shown instead. AYAKA mode displays the official image, while MOMOKA mode keeps the existing developer fallback.
+The LEFT monitor uses the approved AYAKA design at `assets/characters/ayaka/ayaka_left_official.png`. `ayaka/ui/left_display.py` owns this surface so the image renderer can later be replaced by Live2D or another animated character layer without changing CENTER, RIGHT, or the audio pipeline. On Windows, LEFT uses the Win32 `MONITORINFO.rcWork` work area rather than the full monitor rectangle, so a visible taskbar is excluded dynamically. The image is fit within that work area while preserving its aspect ratio; minimal letterboxing is preferred to cropping the HUD. If the asset or Pillow renderer is unavailable, the previous AYAKA placeholder is shown instead. AYAKA mode displays the official image, while MOMOKA mode keeps the existing developer fallback.
 
 On Windows, install the added Pillow dependency and launch the integrated UI:
 

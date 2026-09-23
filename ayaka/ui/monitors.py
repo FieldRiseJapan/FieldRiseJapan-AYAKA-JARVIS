@@ -24,10 +24,23 @@ class MonitorInfo:
     width: int
     height: int
     primary: bool = False
+    work_x: int | None = None
+    work_y: int | None = None
+    work_width: int | None = None
+    work_height: int | None = None
 
     @property
     def right(self) -> int:
         return self.x + self.width
+
+    @property
+    def work_area(self) -> tuple[int, int, int, int]:
+        return (
+            self.x if self.work_x is None else self.work_x,
+            self.y if self.work_y is None else self.work_y,
+            self.width if self.work_width is None else self.work_width,
+            self.height if self.work_height is None else self.work_height,
+        )
 
 
 @dataclass(frozen=True)
@@ -79,6 +92,10 @@ def discover_monitors() -> list[MonitorInfo]:
                 width=rect.right - rect.left,
                 height=rect.bottom - rect.top,
                 primary=bool(info.dwFlags & 1),
+                work_x=info.rcWork.left,
+                work_y=info.rcWork.top,
+                work_width=info.rcWork.right - info.rcWork.left,
+                work_height=info.rcWork.bottom - info.rcWork.top,
             )
         )
         return 1
