@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import Any
 
 from ..config import AnimationConfig
-from .animation import AnimationController, AnimationFrame, CharacterAnimationProvider
+from .animation import AnimationController, AnimationFrame, BlinkPhase, CharacterAnimationProvider
+from .blink_assets import BlinkAssetLoader
 from .left_hud import LeftHudOverlay
 from .state import JarvisState
 
@@ -15,9 +16,13 @@ except ImportError:  # pragma: no cover - headless Linux validation
     tk = None
 
 try:
-    from PIL import Image, ImageTk
+    from PIL import Image
 except ImportError:  # pragma: no cover - exercised only on an incomplete Windows install
     Image = None
+
+try:
+    from PIL import ImageTk
+except ImportError:  # pragma: no cover - exercised only on an incomplete Windows install
     ImageTk = None
 
 
@@ -60,6 +65,35 @@ class StaticImageAnimationProvider:
         self.image_label.place_configure(y=0)
 
 
+class BlinkOverlayAnimationProvider:
+    """Composite approved eye overlays over an in-memory official-image copy."""
+
+    def __init__(self, image_label, base_image, half_image, closed_image, *, photo_factory=None):
+        self.image_label = image_label
+        self.base_image = base_image
+        self.half_image = half_image
+        self.closed_image = closed_image
+        self._photo_factory = photo_factory or ImageTk.PhotoImage
+        self._photo = None
+
+    def apply(self, frame: AnimationFrame) -> None:
+        overlay = {
+            BlinkPhase.HALF: self.half_image,
+            BlinkPhase.CLOSED: self.closed_image,
+        }.get(frame.blink_phase)
+        image = self.base_image.copy()
+        if overlay is not None:
+            image = Image.alpha_composite(image.convert("RGBA"), overlay).convert("RGB")
+        self._photo = self._photo_factory(image)
+        self.image_label.configure(image=self._photo)
+        self.image_label.place_configure(y=frame.vertical_offset_px)
+
+    def reset(self) -> None:
+        self._photo = self._photo_factory(self.base_image.copy())
+        self.image_label.configure(image=self._photo)
+        self.image_label.place_configure(y=0)
+
+
 class LeftDisplay:
     """AYAKA LEFT surface, isolated for a future Live2D/animated replacement."""
 
@@ -78,6 +112,8 @@ class LeftDisplay:
         self.fallback_frame: Any = None
         self.hud = LeftHudOverlay(parent, monitor_size)
         self._photo: ImageTk.PhotoImage | None = None
+        self._base_image: Any = None
+        self._blink_loader = BlinkAssetLoader(self.asset_path)
         self.animation_controller = AnimationController(animation_config)
         self.animation_provider = animation_provider
 
@@ -108,12 +144,22 @@ class LeftDisplay:
         top = (self.monitor_size[1] - resized_size[1]) // 2
         canvas.paste(image, (left, top))
         image = canvas
+        self._base_image = image.copy()
         self._photo = ImageTk.PhotoImage(image)
         self.image_label = tk.Label(self.parent, image=self._photo, borderwidth=0, highlightthickness=0)
         self.image_label.place(relx=0, rely=0, relwidth=1, relheight=1)
         self.image_label.lower(self.fallback_frame)
         if self.animation_provider is None:
-            self.animation_provider = StaticImageAnimationProvider(self.image_label)
+            blink_assets = self._blink_loader.load()
+            if blink_assets.available:
+                self.animation_provider = BlinkOverlayAnimationProvider(
+                    self.image_label,
+                    self._base_image,
+                    blink_assets.half,
+                    blink_assets.closed,
+                )
+            else:
+                self.animation_provider = StaticImageAnimationProvider(self.image_label)
 
     def show_ayaka(self) -> None:
         if self.image_label is not None and self.image_available:
