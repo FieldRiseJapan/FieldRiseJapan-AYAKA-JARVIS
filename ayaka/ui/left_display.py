@@ -75,21 +75,25 @@ class BlinkOverlayAnimationProvider:
         self.closed_image = closed_image
         self._photo_factory = photo_factory or ImageTk.PhotoImage
         self._photo = None
+        self._frames = {
+            BlinkPhase.OPEN: base_image.copy(),
+            BlinkPhase.HALF: Image.alpha_composite(base_image.convert("RGBA"), half_image).convert("RGB"),
+            BlinkPhase.CLOSED: Image.alpha_composite(base_image.convert("RGBA"), closed_image).convert("RGB"),
+        }
+        self._photos = {}
 
     def apply(self, frame: AnimationFrame) -> None:
-        overlay = {
-            BlinkPhase.HALF: self.half_image,
-            BlinkPhase.CLOSED: self.closed_image,
-        }.get(frame.blink_phase)
-        image = self.base_image.copy()
-        if overlay is not None:
-            image = Image.alpha_composite(image.convert("RGBA"), overlay).convert("RGB")
-        self._photo = self._photo_factory(image)
+        phase = frame.blink_phase
+        if phase not in self._photos:
+            self._photos[phase] = self._photo_factory(self._frames[phase])
+        self._photo = self._photos[phase]
         self.image_label.configure(image=self._photo)
         self.image_label.place_configure(y=frame.vertical_offset_px)
 
     def reset(self) -> None:
-        self._photo = self._photo_factory(self.base_image.copy())
+        if BlinkPhase.OPEN not in self._photos:
+            self._photos[BlinkPhase.OPEN] = self._photo_factory(self._frames[BlinkPhase.OPEN])
+        self._photo = self._photos[BlinkPhase.OPEN]
         self.image_label.configure(image=self._photo)
         self.image_label.place_configure(y=0)
 
@@ -136,27 +140,34 @@ class LeftDisplay:
             self.fallback_frame.lift()
 
     def _mount_image(self) -> None:
-        image = Image.open(self.asset_path).convert("RGB")
-        resized_size = fit_contain_size(image.size, self.monitor_size)
-        image = image.resize(resized_size, Image.Resampling.LANCZOS)
-        canvas = Image.new("RGB", self.monitor_size, (0, 0, 0))
+        with Image.open(self.asset_path) as source:
+            native = source.convert("RGB")
+        blink_assets = self._blink_loader.load() if self.animation_provider is None else None
+        if blink_assets and blink_assets.available:
+            native = Image.alpha_composite(native.convert("RGBA"), blink_assets.mouth).convert("RGB")
+
+        resized_size = fit_contain_size(native.size, self.monitor_size)
         left = (self.monitor_size[0] - resized_size[0]) // 2
         top = (self.monitor_size[1] - resized_size[1]) // 2
-        canvas.paste(image, (left, top))
-        image = canvas
+
+        def fitted(source, mode, background):
+            canvas = Image.new(mode, self.monitor_size, background)
+            canvas.paste(source.resize(resized_size, Image.Resampling.LANCZOS), (left, top))
+            return canvas
+
+        image = fitted(native, "RGB", (0, 0, 0))
         self._base_image = image.copy()
         self._photo = ImageTk.PhotoImage(image)
         self.image_label = tk.Label(self.parent, image=self._photo, borderwidth=0, highlightthickness=0)
         self.image_label.place(relx=0, rely=0, relwidth=1, relheight=1)
         self.image_label.lower(self.fallback_frame)
         if self.animation_provider is None:
-            blink_assets = self._blink_loader.load()
-            if blink_assets.available:
+            if blink_assets and blink_assets.available:
                 self.animation_provider = BlinkOverlayAnimationProvider(
                     self.image_label,
                     self._base_image,
-                    blink_assets.half,
-                    blink_assets.closed,
+                    fitted(blink_assets.half, "RGBA", (0, 0, 0, 0)),
+                    fitted(blink_assets.closed, "RGBA", (0, 0, 0, 0)),
                 )
             else:
                 self.animation_provider = StaticImageAnimationProvider(self.image_label)

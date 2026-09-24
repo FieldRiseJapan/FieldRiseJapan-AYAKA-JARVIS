@@ -16,6 +16,7 @@ class BlinkAssets:
     half: Image.Image | None = None
     closed: Image.Image | None = None
     reason: str = ""
+    mouth: Image.Image | None = None
 
 
 class BlinkAssetLoader:
@@ -23,6 +24,7 @@ class BlinkAssetLoader:
 
     HALF_NAME = "eyes_half.png"
     CLOSED_NAME = "eyes_closed.png"
+    MOUTH_NAME = "mouth_closed.png"
 
     def __init__(self, official_asset: Path):
         self.official_asset = official_asset
@@ -31,6 +33,10 @@ class BlinkAssetLoader:
     @property
     def eyes_directory(self) -> Path:
         return self.official_asset.parent / "animation" / "eyes"
+
+    @property
+    def mouth_directory(self) -> Path:
+        return self.official_asset.parent / "animation" / "mouth"
 
     def load(self) -> BlinkAssets:
         if self._result is not None:
@@ -42,8 +48,9 @@ class BlinkAssetLoader:
             loaded = {
                 "half": self._load_overlay(self.eyes_directory / self.HALF_NAME, native_size),
                 "closed": self._load_overlay(self.eyes_directory / self.CLOSED_NAME, native_size),
+                "mouth": self._load_overlay(self.mouth_directory / self.MOUTH_NAME, native_size),
             }
-            self._result = BlinkAssets(True, loaded["half"], loaded["closed"])
+            self._result = BlinkAssets(True, loaded["half"], loaded["closed"], mouth=loaded["mouth"])
         except (OSError, ValueError) as exc:
             self._result = BlinkAssets(False, reason=str(exc))
         return self._result
