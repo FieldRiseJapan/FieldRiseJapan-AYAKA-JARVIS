@@ -3,7 +3,9 @@ import argparse
 import queue
 import threading
 
-from ..commands import CommandRouter
+from ..brain.flow import BrainFlow
+from ..brain.provider import FallbackProvider
+from ..brain.router import BrainRouter
 from ..config import AppConfig
 from ..main import load_config, speak_windows
 from ..recorder import record_wav
@@ -54,12 +56,15 @@ def run(config_path: Path, work_dir: Path):
 
     config = load_config(config_path)
     events: queue.Queue = queue.Queue()
-    router = CommandRouter()
+    router = BrainRouter()
     worker: VoiceWorker | None = None
     app: JarvisUiApp | None = None
     speech_generation = 0
+    brain_flow: BrainFlow | None = None
 
     def close_ui():
+        if brain_flow:
+            brain_flow.invalidate()
         if worker:
             worker.stop()
         if app and app.root:
@@ -71,24 +76,21 @@ def run(config_path: Path, work_dir: Path):
     def speak_and_signal(response: str, generation: int):
         speak_with_envelope(response, generation, events, speak_windows)
 
-    def dispatch_transcript(transcript: str):
+    def dispatch_command(intent):
         nonlocal speech_generation
         if not app or not app.root:
             return
-        intent = router.route(transcript)
         response = controller.dispatch(intent)
+        finish_dispatch(response)
+
+    def finish_dispatch(response: str | None):
+        nonlocal speech_generation
         if response:
             speech_generation += 1
             threading.Thread(target=speak_and_signal, args=(response, speech_generation), daemon=True).start()
         else:
             speech_generation += 1
             voice_flow.speech_completed()
-
-    def begin_execution(transcript: str):
-        if not app or not app.root:
-            return
-        voice_flow.begin_execution()
-        app.root.after(STATE_HOLD_MS, lambda: dispatch_transcript(transcript))
 
     def poll_events():
         if not app or not app.root:
@@ -97,8 +99,9 @@ def run(config_path: Path, work_dir: Path):
             while True:
                 kind, payload = events.get_nowait()
                 if kind == "transcript":
-                    voice_flow.transcript_received()
-                    app.root.after(STATE_HOLD_MS, lambda transcript=payload: begin_execution(transcript))
+                    brain_flow.transcript(payload, STATE_HOLD_MS)
+                elif kind == "brain_response":
+                    brain_flow.complete(*payload)
                 elif kind == "speech_complete":
                     if payload == speech_generation:
                         voice_flow.speech_completed()
@@ -128,8 +131,11 @@ def run(config_path: Path, work_dir: Path):
         app.root.after(50, poll_events)
 
     def on_ready(current_app):
-        nonlocal app, worker
+        nonlocal app, worker, brain_flow
         app = current_app
+        brain_flow = BrainFlow(router, FallbackProvider(), lambda: app.state.mode,
+                               voice_flow, app.root.after, dispatch_command,
+                               finish_dispatch, events)
         worker = VoiceWorker(config, work_dir, events)
         voice_flow.begin_listening()
         worker.start()
