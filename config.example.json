@@ -26,9 +26,9 @@
     "enabled": true,
     "blink_enabled": true,
     "lipsync_enabled": true,
-    "breathing_enabled": false,
+    "breathing_enabled": true,
     "breathing_amplitude_px": 1,
-    "breathing_period_seconds": 4.0,
+    "breathing_period_seconds": 6.0,
     "frame_interval_ms": 100
   },
   "wake_words": ["彩花", "おはよう"],

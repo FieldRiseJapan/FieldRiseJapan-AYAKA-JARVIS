@@ -43,12 +43,12 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(whisper.language, "ja")
         self.assertEqual(whisper.chunk_seconds, 5)
 
-    def test_animation_defaults_disable_visible_motion(self):
+    def test_animation_defaults_enable_subtle_motion(self):
         animation = AnimationConfig()
 
-        self.assertFalse(animation.breathing_enabled)
+        self.assertTrue(animation.breathing_enabled)
         self.assertEqual(animation.safe_breathing_amplitude_px, 1)
-        self.assertEqual(animation.breathing_period_seconds, 4.0)
+        self.assertEqual(animation.breathing_period_seconds, 6.0)
         self.assertEqual(animation.frame_interval_ms, 100)
 
     def test_legacy_config_without_animation_uses_safe_defaults(self):
@@ -58,8 +58,16 @@ class ConfigTests(unittest.TestCase):
 
             config = load_config(path)
 
-        self.assertFalse(config.animation.breathing_enabled)
+        self.assertTrue(config.animation.breathing_enabled)
         self.assertEqual(config.animation.safe_breathing_amplitude_px, 1)
+        self.assertEqual(config.animation.breathing_period_seconds, 6.0)
+
+    def test_example_config_matches_micro_motion_defaults(self):
+        example = json.loads((Path(__file__).parents[1] / "config.example.json").read_text(encoding="utf-8"))["animation"]
+        defaults = AnimationConfig()
+        self.assertEqual(example["breathing_enabled"], defaults.breathing_enabled)
+        self.assertEqual(example["breathing_amplitude_px"], defaults.breathing_amplitude_px)
+        self.assertEqual(example["breathing_period_seconds"], defaults.breathing_period_seconds)
 
     def test_animation_config_is_loaded_from_json(self):
         with tempfile.TemporaryDirectory() as temp_dir:

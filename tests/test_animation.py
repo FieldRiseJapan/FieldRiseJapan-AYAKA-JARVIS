@@ -67,15 +67,48 @@ class AnimationControllerTests(unittest.TestCase):
 
         self.assertEqual(frame.mouth_open, 0.0)
 
-    def test_breathing_is_disabled_by_default(self):
+    def test_default_micro_motion_has_six_second_period_and_one_pixel_limit(self):
         controller = AnimationController(AnimationConfig(), clock=lambda: 0.0)
 
         offsets = [
             controller.update(JarvisState.LISTENING, now=now).vertical_offset_px
-            for now in (0.0, 1.0, 2.0, 3.0, 4.0)
+            for now in (0.0, 1.5, 3.0, 4.5, 6.0)
         ]
 
-        self.assertEqual(offsets, [0, 0, 0, 0, 0])
+        self.assertEqual(offsets, [0, 1, 0, -1, 0])
+        self.assertTrue(all(abs(controller.update(JarvisState.STANDBY, now=n / 10).vertical_offset_px) <= 1 for n in range(61)))
+
+    def test_micro_motion_continues_through_every_operational_state(self):
+        controller = AnimationController(AnimationConfig(), clock=lambda: 0.0)
+        states = (JarvisState.STANDBY, JarvisState.LISTENING, JarvisState.THINKING,
+                  JarvisState.EXECUTING, JarvisState.SPEAKING)
+        self.assertEqual([controller.update(state, now=1.5).vertical_offset_px for state in states], [1] * 5)
+        self.assertEqual(controller.update(JarvisState.LISTENING, now=4.5).vertical_offset_px, -1)
+
+    def test_micro_motion_does_not_change_blink_or_mouth_timing(self):
+        moving = AnimationController(AnimationConfig(), clock=lambda: 0.0, blink_interval=lambda: 1.5)
+        still = AnimationController(AnimationConfig(breathing_enabled=False), clock=lambda: 0.0, blink_interval=lambda: 1.5)
+        for now in (0.0, 1.5, 1.6, 1.75, 1.9, 2.1):
+            with self.subTest(now=now):
+                moving_frame = moving.update(JarvisState.SPEAKING, now=now)
+                still_frame = still.update(JarvisState.SPEAKING, now=now)
+                self.assertEqual(moving_frame.blink_phase, still_frame.blink_phase)
+                self.assertEqual(moving_frame.mouth_shape, still_frame.mouth_shape)
+                self.assertEqual(still_frame.vertical_offset_px, 0)
+
+    def test_micro_motion_reset_and_disabled_or_invalid_settings(self):
+        current = [0.0]
+        controller = AnimationController(AnimationConfig(), clock=lambda: current[0])
+        self.assertEqual(controller.update(JarvisState.LISTENING, now=1.5).vertical_offset_px, 1)
+        current[0] = 1.5
+        controller.reset()
+        self.assertEqual(controller.update(JarvisState.LISTENING, now=1.5).vertical_offset_px, 0)
+        for config in (AnimationConfig(breathing_enabled=False),
+                       AnimationConfig(breathing_amplitude_px=0),
+                       AnimationConfig(breathing_period_seconds=0),
+                       AnimationConfig(breathing_period_seconds=-1)):
+            with self.subTest(config=config):
+                self.assertEqual(AnimationController(config, clock=lambda: 0.0).update(JarvisState.SPEAKING, now=1.5).vertical_offset_px, 0)
 
     def test_breathing_amplitude_is_clamped_to_two_pixels(self):
         controller = AnimationController(
