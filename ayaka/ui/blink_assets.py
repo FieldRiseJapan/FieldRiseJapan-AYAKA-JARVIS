@@ -45,12 +45,13 @@ class BlinkAssetLoader:
         try:
             with Image.open(self.official_asset) as official:
                 native_size = official.size
-            loaded = {
-                "half": self._load_overlay(self.eyes_directory / self.HALF_NAME, native_size),
-                "closed": self._load_overlay(self.eyes_directory / self.CLOSED_NAME, native_size),
-                "mouth": self._load_overlay(self.mouth_directory / self.MOUTH_NAME, native_size),
-            }
-            self._result = BlinkAssets(True, loaded["half"], loaded["closed"], mouth=loaded["mouth"])
+            half = self._load_overlay(self.eyes_directory / self.HALF_NAME, native_size)
+            closed = self._load_overlay(self.eyes_directory / self.CLOSED_NAME, native_size)
+            try:
+                mouth = self._load_overlay(self.mouth_directory / self.MOUTH_NAME, native_size)
+            except (OSError, ValueError):
+                mouth = None
+            self._result = BlinkAssets(True, half, closed, mouth=mouth)
         except (OSError, ValueError) as exc:
             self._result = BlinkAssets(False, reason=str(exc))
         return self._result

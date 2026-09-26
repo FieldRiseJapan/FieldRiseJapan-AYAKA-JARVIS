@@ -5,8 +5,9 @@ from pathlib import Path
 from typing import Any
 
 from ..config import AnimationConfig
-from .animation import AnimationController, AnimationFrame, BlinkPhase, CharacterAnimationProvider
+from .animation import AnimationController, AnimationFrame, BlinkPhase, MouthShape, CharacterAnimationProvider
 from .blink_assets import BlinkAssetLoader
+from .mouth_assets import MouthAssetLoader
 from .left_hud import LeftHudOverlay
 from .state import JarvisState
 
@@ -68,32 +69,37 @@ class StaticImageAnimationProvider:
 class BlinkOverlayAnimationProvider:
     """Composite approved eye overlays over an in-memory official-image copy."""
 
-    def __init__(self, image_label, base_image, half_image, closed_image, *, photo_factory=None):
+    def __init__(self, image_label, base_image, half_image, closed_image, *, mouth_closed=None, mouth_open=None, photo_factory=None):
         self.image_label = image_label
         self.base_image = base_image
         self.half_image = half_image
         self.closed_image = closed_image
         self._photo_factory = photo_factory or ImageTk.PhotoImage
         self._photo = None
-        self._frames = {
-            BlinkPhase.OPEN: base_image.copy(),
-            BlinkPhase.HALF: Image.alpha_composite(base_image.convert("RGBA"), half_image).convert("RGB"),
-            BlinkPhase.CLOSED: Image.alpha_composite(base_image.convert("RGBA"), closed_image).convert("RGB"),
-        }
+        self._frames = {}
+        for phase, eye in ((BlinkPhase.OPEN, None), (BlinkPhase.HALF, half_image), (BlinkPhase.CLOSED, closed_image)):
+            eyed = base_image.convert("RGBA")
+            if eye is not None:
+                eyed = Image.alpha_composite(eyed, eye)
+            closed = Image.alpha_composite(eyed, mouth_closed) if mouth_closed is not None else eyed
+            self._frames[(phase, MouthShape.CLOSED)] = closed.convert("RGB")
+            opened = Image.alpha_composite(eyed, mouth_open) if mouth_open is not None else closed
+            self._frames[(phase, MouthShape.OPEN)] = opened.convert("RGB")
         self._photos = {}
 
     def apply(self, frame: AnimationFrame) -> None:
-        phase = frame.blink_phase
-        if phase not in self._photos:
-            self._photos[phase] = self._photo_factory(self._frames[phase])
-        self._photo = self._photos[phase]
+        key = (frame.blink_phase, MouthShape.OPEN if frame.speaking and frame.mouth_shape is MouthShape.OPEN else MouthShape.CLOSED)
+        if key not in self._photos:
+            self._photos[key] = self._photo_factory(self._frames[key])
+        self._photo = self._photos[key]
         self.image_label.configure(image=self._photo)
         self.image_label.place_configure(y=frame.vertical_offset_px)
 
     def reset(self) -> None:
-        if BlinkPhase.OPEN not in self._photos:
-            self._photos[BlinkPhase.OPEN] = self._photo_factory(self._frames[BlinkPhase.OPEN])
-        self._photo = self._photos[BlinkPhase.OPEN]
+        key = (BlinkPhase.OPEN, MouthShape.CLOSED)
+        if key not in self._photos:
+            self._photos[key] = self._photo_factory(self._frames[key])
+        self._photo = self._photos[key]
         self.image_label.configure(image=self._photo)
         self.image_label.place_configure(y=0)
 
@@ -118,6 +124,7 @@ class LeftDisplay:
         self._photo: ImageTk.PhotoImage | None = None
         self._base_image: Any = None
         self._blink_loader = BlinkAssetLoader(self.asset_path)
+        self._mouth_loader = MouthAssetLoader(self.asset_path)
         self.animation_controller = AnimationController(animation_config)
         self.animation_provider = animation_provider
 
@@ -143,8 +150,7 @@ class LeftDisplay:
         with Image.open(self.asset_path) as source:
             native = source.convert("RGB")
         blink_assets = self._blink_loader.load() if self.animation_provider is None else None
-        if blink_assets and blink_assets.available:
-            native = Image.alpha_composite(native.convert("RGBA"), blink_assets.mouth).convert("RGB")
+        mouth_closed, mouth_open = self._mouth_loader.load() if self.animation_provider is None else (None, None)
 
         resized_size = fit_contain_size(native.size, self.monitor_size)
         left = (self.monitor_size[0] - resized_size[0]) // 2
@@ -157,17 +163,23 @@ class LeftDisplay:
 
         image = fitted(native, "RGB", (0, 0, 0))
         self._base_image = image.copy()
-        self._photo = ImageTk.PhotoImage(image)
+        fitted_mouth_closed = fitted(mouth_closed, "RGBA", (0, 0, 0, 0)) if mouth_closed is not None else None
+        fitted_mouth_open = fitted(mouth_open, "RGBA", (0, 0, 0, 0)) if mouth_open is not None else None
+        initial = Image.alpha_composite(image.convert("RGBA"), fitted_mouth_closed).convert("RGB") if fitted_mouth_closed is not None else image
+        self._photo = ImageTk.PhotoImage(initial)
         self.image_label = tk.Label(self.parent, image=self._photo, borderwidth=0, highlightthickness=0)
         self.image_label.place(relx=0, rely=0, relwidth=1, relheight=1)
         self.image_label.lower(self.fallback_frame)
         if self.animation_provider is None:
-            if blink_assets and blink_assets.available:
+            if (blink_assets and blink_assets.available) or fitted_mouth_closed is not None:
+                transparent = Image.new("RGBA", self.monitor_size, (0, 0, 0, 0))
                 self.animation_provider = BlinkOverlayAnimationProvider(
                     self.image_label,
                     self._base_image,
-                    fitted(blink_assets.half, "RGBA", (0, 0, 0, 0)),
-                    fitted(blink_assets.closed, "RGBA", (0, 0, 0, 0)),
+                    fitted(blink_assets.half, "RGBA", (0, 0, 0, 0)) if blink_assets and blink_assets.available else transparent,
+                    fitted(blink_assets.closed, "RGBA", (0, 0, 0, 0)) if blink_assets and blink_assets.available else transparent,
+                    mouth_closed=fitted_mouth_closed,
+                    mouth_open=fitted_mouth_open,
                 )
             else:
                 self.animation_provider = StaticImageAnimationProvider(self.image_label)

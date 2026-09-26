@@ -49,6 +49,7 @@ class AnimationController:
     HALF_CLOSE_SECONDS = 0.08
     CLOSED_SECONDS = 0.12
     HALF_OPEN_SECONDS = 0.08
+    MOUTH_INTERVAL_SECONDS = 0.18
 
     def __init__(
         self,
@@ -64,6 +65,7 @@ class AnimationController:
         self._next_blink_at = self._started_at + max(0.1, self._blink_interval())
         self._state = JarvisState.STANDBY
         self._speaking_level = 0.0
+        self._speaking_started_at: float | None = None
 
     def set_speaking_level(self, level: float) -> None:
         try:
@@ -74,6 +76,7 @@ class AnimationController:
 
     def reset(self) -> None:
         self._speaking_level = 0.0
+        self._speaking_started_at = None
         self._state = JarvisState.STANDBY
         self._started_at = self._clock()
         self._next_blink_at = self._started_at + max(0.1, self._blink_interval())
@@ -82,6 +85,9 @@ class AnimationController:
         current_time = self._clock() if now is None else now
         if self._state is JarvisState.SPEAKING and state is not JarvisState.SPEAKING:
             self._speaking_level = 0.0
+            self._speaking_started_at = None
+        elif self._state is not JarvisState.SPEAKING and state is JarvisState.SPEAKING:
+            self._speaking_started_at = current_time
         self._state = state
         speaking = self.config.enabled and state is JarvisState.SPEAKING
         level = self._speaking_level if speaking and self.config.lipsync_enabled else 0.0
@@ -91,8 +97,14 @@ class AnimationController:
             blink_phase=self._blink_phase(current_time) if self.config.enabled and self.config.blink_enabled else BlinkPhase.OPEN,
             mouth_open=level,
             speaking=speaking,
-            mouth_shape=self._mouth_shape(level),
+            mouth_shape=self._timed_mouth(current_time) if speaking and self.config.lipsync_enabled else MouthShape.CLOSED,
         )
+
+    def _timed_mouth(self, now: float) -> MouthShape:
+        if self._speaking_started_at is None:
+            return MouthShape.CLOSED
+        elapsed = max(0.0, now - self._speaking_started_at)
+        return MouthShape.OPEN if int(elapsed / self.MOUTH_INTERVAL_SECONDS) % 2 else MouthShape.CLOSED
 
     @staticmethod
     def _mouth_shape(level: float) -> MouthShape:
