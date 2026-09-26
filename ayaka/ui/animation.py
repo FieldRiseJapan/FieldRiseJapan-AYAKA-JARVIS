@@ -12,6 +12,7 @@ from typing import Protocol
 
 from ..config import AnimationConfig
 from .state import JarvisState
+from .voice_sync import WINDOW_SECONDS, OPEN_HOLD_SECONDS, CLOSED_HOLD_SECONDS
 
 
 class BlinkPhase(str, Enum):
@@ -66,6 +67,26 @@ class AnimationController:
         self._state = JarvisState.STANDBY
         self._speaking_level = 0.0
         self._speaking_started_at: float | None = None
+        self._voice_envelope: tuple[float, ...] | None = None
+        self._voice_started_at = 0.0
+        self._voice_duration = 0.0
+        self._voice_threshold = 0.0
+        self._voice_mouth = MouthShape.CLOSED
+        self._mouth_changed_at = 0.0
+
+    def set_voice_envelope(self, values: tuple[float, ...], duration: float, threshold: float, started_at: float) -> None:
+        if not values or duration <= 0 or threshold <= 0 or not all(math.isfinite(v) and v >= 0 for v in (*values, duration, threshold, started_at)):
+            raise ValueError("invalid voice envelope")
+        self._voice_envelope = values
+        self._voice_duration = duration
+        self._voice_threshold = threshold
+        self._voice_started_at = started_at
+        self._voice_mouth = MouthShape.CLOSED
+        self._mouth_changed_at = started_at - CLOSED_HOLD_SECONDS
+
+    def clear_voice_envelope(self) -> None:
+        self._voice_envelope = None
+        self._voice_mouth = MouthShape.CLOSED
 
     def set_speaking_level(self, level: float) -> None:
         try:
@@ -75,6 +96,7 @@ class AnimationController:
             self._speaking_level = 0.0
 
     def reset(self) -> None:
+        self.clear_voice_envelope()
         self._speaking_level = 0.0
         self._speaking_started_at = None
         self._state = JarvisState.STANDBY
@@ -86,6 +108,7 @@ class AnimationController:
         if self._state is JarvisState.SPEAKING and state is not JarvisState.SPEAKING:
             self._speaking_level = 0.0
             self._speaking_started_at = None
+            self.clear_voice_envelope()
         elif self._state is not JarvisState.SPEAKING and state is JarvisState.SPEAKING:
             self._speaking_started_at = current_time
         self._state = state
@@ -97,8 +120,22 @@ class AnimationController:
             blink_phase=self._blink_phase(current_time) if self.config.enabled and self.config.blink_enabled else BlinkPhase.OPEN,
             mouth_open=level,
             speaking=speaking,
-            mouth_shape=self._timed_mouth(current_time) if speaking and self.config.lipsync_enabled else MouthShape.CLOSED,
+            mouth_shape=(self._voice_mouth_at(current_time) if self._voice_envelope is not None else self._timed_mouth(current_time))
+            if speaking and self.config.lipsync_enabled else MouthShape.CLOSED,
         )
+
+    def _voice_mouth_at(self, now: float) -> MouthShape:
+        elapsed = now - self._voice_started_at
+        if elapsed < 0 or elapsed + 1e-9 >= self._voice_duration:
+            self._voice_mouth = MouthShape.CLOSED
+            return MouthShape.CLOSED
+        index = min(int((elapsed + 1e-9) / WINDOW_SECONDS), len(self._voice_envelope) - 1)
+        desired = MouthShape.OPEN if self._voice_envelope[index] >= self._voice_threshold else MouthShape.CLOSED
+        hold = OPEN_HOLD_SECONDS if self._voice_mouth is MouthShape.OPEN else CLOSED_HOLD_SECONDS
+        if desired is not self._voice_mouth and now - self._mouth_changed_at >= hold:
+            self._voice_mouth = desired
+            self._mouth_changed_at = now
+        return self._voice_mouth
 
     def _timed_mouth(self, now: float) -> MouthShape:
         if self._speaking_started_at is None:

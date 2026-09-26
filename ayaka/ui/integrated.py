@@ -11,6 +11,8 @@ from ..stt import WhisperCppSTT
 from .controller import JarvisController
 from .monitors import discover_layout
 from .voice_flow import VoiceUiFlow
+from .state import JarvisMode, JarvisState
+from .voice_sync import speak_with_envelope
 
 
 STATE_HOLD_MS = 550
@@ -55,6 +57,7 @@ def run(config_path: Path, work_dir: Path):
     router = CommandRouter()
     worker: VoiceWorker | None = None
     app: JarvisUiApp | None = None
+    speech_generation = 0
 
     def close_ui():
         if worker:
@@ -65,21 +68,20 @@ def run(config_path: Path, work_dir: Path):
     controller = JarvisController(on_close=close_ui)
     voice_flow = VoiceUiFlow(controller.state)
 
-    def speak_and_signal(response: str):
-        try:
-            speak_windows(response)
-        finally:
-            events.put(("speech_complete", None))
+    def speak_and_signal(response: str, generation: int):
+        speak_with_envelope(response, generation, events, speak_windows)
 
     def dispatch_transcript(transcript: str):
+        nonlocal speech_generation
         if not app or not app.root:
             return
         intent = router.route(transcript)
         response = controller.dispatch(intent)
         if response:
-            voice_flow.begin_speaking()
-            threading.Thread(target=speak_and_signal, args=(response,), daemon=True).start()
+            speech_generation += 1
+            threading.Thread(target=speak_and_signal, args=(response, speech_generation), daemon=True).start()
         else:
+            speech_generation += 1
             voice_flow.speech_completed()
 
     def begin_execution(transcript: str):
@@ -98,12 +100,32 @@ def run(config_path: Path, work_dir: Path):
                     voice_flow.transcript_received()
                     app.root.after(STATE_HOLD_MS, lambda transcript=payload: begin_execution(transcript))
                 elif kind == "speech_complete":
-                    voice_flow.speech_completed()
+                    if payload == speech_generation:
+                        voice_flow.speech_completed()
+                        if app.left_display and app.state.mode is JarvisMode.AYAKA:
+                            app.left_display.animate(JarvisState.LISTENING)
+                elif kind == "speech_prepared":
+                    generation, gate = payload
+                    if generation == speech_generation and app.state.mode is JarvisMode.AYAKA:
+                        gate.set()
+                elif kind == "speech_started":
+                    generation, envelope, started_at = payload
+                    if generation == speech_generation and app.state.mode is JarvisMode.AYAKA:
+                        try:
+                            app.left_display.animation_controller.set_voice_envelope(*envelope, started_at)
+                            voice_flow.begin_speaking()
+                        except (AttributeError, ValueError):
+                            voice_flow.begin_speaking()  # Keep the 0.18 s fallback.
+                elif kind == "speech_fallback":
+                    if payload == speech_generation and app.state.mode is JarvisMode.AYAKA:
+                        if app.left_display:
+                            app.left_display.animation_controller.clear_voice_envelope()
+                        voice_flow.begin_speaking()
                 elif kind == "error":
                     print(f"VOICE WORKER ERROR: {payload}", flush=True)
         except queue.Empty:
             pass
-        app.root.after(100, poll_events)
+        app.root.after(50, poll_events)
 
     def on_ready(current_app):
         nonlocal app, worker

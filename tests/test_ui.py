@@ -196,6 +196,17 @@ class UiAnimationLoopTests(unittest.TestCase):
         self.assertEqual(app.left_display.animated_states, [])
         self.assertEqual(app.left_display.reset_count, 1)
 
+    def test_speaking_uses_fifty_ms_refresh_without_changing_other_states(self):
+        state = UiState(system_state=JarvisState.SPEAKING)
+        app = JarvisUiApp(state=state, animation_config=AnimationConfig(frame_interval_ms=100))
+        app.root = self.FakeRoot()
+        app.left_display = self.FakeLeftDisplay()
+        app._refresh_animation()
+        self.assertEqual(app.root.scheduled[0][0], 50)
+        state.set_system_state(JarvisState.LISTENING)
+        app._refresh_animation()
+        self.assertEqual(app.root.scheduled[1][0], 100)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -8,7 +8,7 @@ from ..config import AnimationConfig
 from .dashboard import CARD_GRID_COLUMNS, CARD_GRID_ROWS, CENTER_CARDS, CENTER_CORE_SIZE
 from .left_display import LeftDisplay
 from .monitors import MonitorLayout, discover_layout
-from .state import DashboardPage, JarvisMode, UiState
+from .state import DashboardPage, JarvisMode, JarvisState, UiState
 
 
 BACKGROUND = "#050b18"
@@ -197,7 +197,7 @@ class JarvisUiApp:
                 self.left_display.animate(self.state.system_state)
             else:
                 self.left_display.reset_animation()
-        interval_ms = max(16, self.animation_config.frame_interval_ms)
+        interval_ms = 50 if self.state.system_state is JarvisState.SPEAKING else max(16, self.animation_config.frame_interval_ms)
         self.root.after(interval_ms, self._refresh_animation)
 
     def run(self):
